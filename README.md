@@ -1,6 +1,11 @@
 # purescript-timeline
 
-There are a number of data types using obscure verbiage in this project - roughly speaking, here is a definition list:
+This project defines the types and operations used in a timeline, while trying to focus only on the operational aspects of
+the associated types, and not user-interface associated data like documents and descriptions.
+
+## Definitions
+
+There are a number of data types using obscure verbiage in this project:
 
 - A "**TimeSpace**" is a physically traversable, presented view of multiple timelines, over some **TimeScale**.
 - A "**TimeScale**" is the definition for how time passes over some units of space (or vise-versa); for instance,
