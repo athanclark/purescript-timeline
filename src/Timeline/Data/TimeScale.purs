@@ -5,3 +5,4 @@ newtype TimeScale aux a = TimeScale
   { beginIndex :: a
   , endIndex   :: a
   | aux }
+
