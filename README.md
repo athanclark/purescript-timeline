@@ -12,3 +12,9 @@ There are a number of data types using obscure verbiage in this project - roughl
 - A "**TimeSpan**" serves two purposes: a document that identifies a range between two specific times defined in a **TimeScale**, _and_ a
   potential sub-**TimeSpace**, where a new **TimeScale** and series of **TimeLines** may be defined; for instance, the parent **Timeline** may define
   Earth's history logarithmically, and a small **TimeSpan** may define Human history with a linear **TimeSpace**.
+- A "**TimeIndex**" comes in three flavors:
+  - "**Human**" - an Index that makes sense to humans; for instance, a Current-Era date "March 27th, 2020".
+  - "**Presentable**" - an Index that makes sense to a **TimeSpace** - which can only be a JavaScript `Number`, to denote some offset in SVG
+  - "**Comparable**" - an Index that makes sense to a _total order_ - probably also a JavaScript `Number`; we'll use this to sort, move, and order the data internally
+  - "**Storable**" - an Index that makes sense to JSON and ArrayBuffers - minimalistic approach to representing the **Human TimeIndex** without losing any data.
+    This could be a `Int8` for small enough **TimeScales**, or it may just be a `UTF-8 String` for a Date-Time.
