@@ -18,3 +18,15 @@ There are a number of data types using obscure verbiage in this project - roughl
   - "**Comparable**" - an Index that makes sense to a _total order_ - probably also a JavaScript `Number`; we'll use this to sort, move, and order the data internally
   - "**Storable**" - an Index that makes sense to JSON and ArrayBuffers - minimalistic approach to representing the **Human TimeIndex** without losing any data.
     This could be a `Int8` for small enough **TimeScales**, or it may just be a `UTF-8 String` for a Date-Time.
+
+## Hierarchy
+
+- TimeSpace
+  - TimeScale
+    - TimeIndex
+  - TimeLine
+    - Event
+      - TimeIndex
+    - TimeSpan
+      - TimeIndex
+      - TimeSpace
