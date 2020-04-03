@@ -11,7 +11,8 @@
     "purescript-console": "^4.4.0",
     "purescript-effect": "^2.0.1",
     "purescript-arraybuffer-types": "^2.0.0",
-    "purescript-argonaut": "^6.0.0"
+    "purescript-argonaut": "^6.0.0",
+    "purescript-indexed-set": "git://github.com/openchronology/purescript-indexed-set.git"
   },
   "devDependencies": {
     "purescript-psci-support": "^4.0.0"
