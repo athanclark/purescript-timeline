@@ -1,8 +1,6 @@
 module Timeline.Data where
 
 import Prelude
-import Data.Eq (class EqRecord)
-import Data.Ord (class OrdRecord)
 import Data.Maybe (Maybe)
 import Data.IxSet (IxSet, Index)
 import Data.IxSet (insert, delete, lookup) as Ix
@@ -10,7 +8,6 @@ import Data.Generic.Rep (class Generic)
 import Data.Generic.Rep.Eq (genericEq)
 import Data.Generic.Rep.Ord (genericCompare)
 import Effect (Effect)
-import Prim.RowList (class RowToList)
 
 
 
@@ -18,53 +15,53 @@ import Prim.RowList (class RowToList)
 
 -- | A space where all time-definable values are stored; timelines, events, and time spans. Also defines how time
 -- | is represented spatially; a time-scale.
-type TimeSpace timeSpaceAux timelineAux timeScaleAux eventAux timeSpanAux index =
-  { timeScale :: TimeScale timeScaleAux index
-  , timelines :: IxSet (Timeline timeSpaceAux timelineAux timeScaleAux eventAux timeSpanAux index) -- ^ Mutable reference
+newtype TimeSpace index = TimeSpace
+  { timeScale :: TimeScale index
+  , timelines :: IxSet (Timeline index) -- ^ Mutable reference
   -- FIXME add cross-referenced timeline children? Ones that _reference_ multiple timelines, rather than belong to them
-  | timeSpaceAux }
+  -- non-essential
+  , title       :: String
+  , description :: String
+  , document    :: String -- TODO markdown
+  -- TODO markers, metrics & graduation
+  }
+derive instance genericTimeSpace :: Generic (TimeSpace index) _
+derive newtype instance eqTimeSpace :: Ord index => Eq (TimeSpace index)
+derive newtype instance ordTimeSpace :: Ord index => Ord (TimeSpace index)
 
 -- | Alias to not confuse this with a TimeIndex
 type TimelineNum = Index
 
 
-insertTimeline :: forall timeSpaceAux timelineAux timeScaleAux eventAux timeSpanAux index
-                . TimeSpace timeSpaceAux timelineAux timeScaleAux eventAux timeSpanAux index
-               -> Timeline timeSpaceAux timelineAux timeScaleAux eventAux timeSpanAux index
+insertTimeline :: forall index
+                . TimeSpace index
+               -> Timeline index
                -> Effect TimelineNum
-insertTimeline t c = Ix.insert c t.timelines
+insertTimeline (TimeSpace t) c = Ix.insert c t.timelines
 
 
-deleteTimeline :: forall timeSpaceAux timelineAux timeScaleAux eventAux timeSpanAux index
-                . TimeSpace timeSpaceAux timelineAux timeScaleAux eventAux timeSpanAux index
+deleteTimeline :: forall index
+                . TimeSpace index
                -> TimelineNum
                -> Effect Unit
-deleteTimeline t i = Ix.delete i t.timelines
+deleteTimeline (TimeSpace t) i = Ix.delete i t.timelines
 
 
-lookupTimeline :: forall timeSpaceAux timelineAux timeScaleAux eventAux timeSpanAux index
-                . TimeSpace timeSpaceAux timelineAux timeScaleAux eventAux timeSpanAux index
+lookupTimeline :: forall index
+                . TimeSpace index
                -> TimelineNum
-               -> Effect (Maybe (Timeline timeSpaceAux timelineAux timeScaleAux eventAux timeSpanAux index))
-lookupTimeline t i = Ix.lookup i t.timelines
+               -> Effect (Maybe (Timeline index))
+lookupTimeline (TimeSpace t) i = Ix.lookup i t.timelines
 
 
 
 -- | All possible Human Time Indicies, with their instances assumed existing
-data TimeSpaceDecided timeSpaceAux timelineAux timeScaleAux eventAux timeSpanAux
-  = TimeSpaceNumber (TimeSpace timeSpaceAux timelineAux timeScaleAux eventAux timeSpanAux Number)
-derive instance genericTimeSpaceDecided :: Generic (TimeSpaceDecided timeSpaceAux timelineAux timeScaleAux eventAux timeSpanAux) _
-instance eqTimeSpaceDecided :: ( RowToList ( timeScale :: TimeScale timeScaleAux Number
-                                           , timelines :: IxSet (Timeline timeSpaceAux timelineAux timeScaleAux eventAux timeSpanAux Number) | timeSpaceAux) t1
-                               , EqRecord t1 ( timeScale :: TimeScale timeScaleAux Number
-                                             , timelines :: IxSet (Timeline timeSpaceAux timelineAux timeScaleAux eventAux timeSpanAux Number) | timeSpaceAux)
-                               ) => Eq (TimeSpaceDecided timeSpaceAux timelineAux timeScaleAux eventAux timeSpanAux) where
+data TimeSpaceDecided
+  = TimeSpaceNumber (TimeSpace Number)
+derive instance genericTimeSpaceDecided :: Generic TimeSpaceDecided _
+instance eqTimeSpaceDecided :: Eq TimeSpaceDecided where
   eq = genericEq
-instance ordTimeSpaceDecided :: ( RowToList ( timeScale :: TimeScale timeScaleAux Number
-                                            , timelines :: IxSet (Timeline timeSpaceAux timelineAux timeScaleAux eventAux timeSpanAux Number) | timeSpaceAux) t1
-                                , OrdRecord t1 ( timeScale :: TimeScale timeScaleAux Number
-                                               , timelines :: IxSet (Timeline timeSpaceAux timelineAux timeScaleAux eventAux timeSpanAux Number) | timeSpaceAux)
-                                ) => Ord (TimeSpaceDecided timeSpaceAux timelineAux timeScaleAux eventAux timeSpanAux) where
+instance ordTimeSpaceDecided :: Ord TimeSpaceDecided where
   compare = genericCompare
 
 
@@ -74,154 +71,158 @@ instance ordTimeSpaceDecided :: ( RowToList ( timeScale :: TimeScale timeScaleAu
 -- ------------------ TimeScale
 
 -- | Parameters for defining how time is represented spatially and numerically
-type TimeScale timeScaleAux index =
+newtype TimeScale index = TimeScale
   { beginIndex :: index
   , endIndex   :: index
   -- TODO human <-> presented interpolation
-  | timeScaleAux }
+  -- non-essential
+  , timeScaleName :: String
+  , description   :: String
+  , units         :: String
+  , document      :: Maybe String -- TODO markdown
+  }
+derive instance genericTimeScale :: Generic (TimeScale index) _
+derive newtype instance eqTimeScale :: Eq index => Eq (TimeScale index)
+derive newtype instance ordTimeScale :: Ord index => Ord (TimeScale index)
 
-changeTimeScaleBegin :: forall timeScaleAux index
-                      . TimeScale timeScaleAux index -> index
-                     -> TimeScale timeScaleAux index
-changeTimeScaleBegin t i = t {beginIndex = i}
+changeTimeScaleBegin :: forall index
+                      . TimeScale index -> index
+                     -> TimeScale index
+changeTimeScaleBegin (TimeScale t) i = TimeScale t {beginIndex = i}
 
-changeTimeScaleEnd :: forall timeScaleAux index
-                    . TimeScale timeScaleAux index -> index
-                   -> TimeScale timeScaleAux index
-changeTimeScaleEnd t i = t {endIndex = i}
+changeTimeScaleEnd :: forall index
+                    . TimeScale index -> index
+                   -> TimeScale index
+changeTimeScaleEnd (TimeScale t) i = TimeScale t {endIndex = i}
 
 
 
 -- ------------------ Timeline
 
 -- | Types of children in a Timeline
-data TimelineChild timeSpaceAux timelineAux timeScaleAux eventAux timeSpanAux index
-  = EventChild (Event eventAux index)
-  | TimeSpanChild (TimeSpan timeSpaceAux timelineAux timeScaleAux eventAux timeSpanAux index)
-derive instance genericTimelineChild :: Generic (TimelineChild timeSpaceAux timelineAux timeScaleAux eventAux timeSpanAux index) _
-instance eqTimelineChild :: ( RowToList (timeIndex :: index | eventAux) t1
-                            , EqRecord t1 (timeIndex :: index | eventAux)
-                            , RowToList ( startIndex :: index, stopIndex :: index
-                                        , timeSpace :: Maybe (TimeSpaceDecided timeSpaceAux timelineAux timeScaleAux eventAux timeSpanAux) | timeSpanAux) t2
-                            , EqRecord t2 ( startIndex :: index, stopIndex :: index
-                                          , timeSpace :: Maybe (TimeSpaceDecided timeSpaceAux timelineAux timeScaleAux eventAux timeSpanAux) | timeSpanAux)
-                            ) => Eq (TimelineChild timeSpaceAux timelineAux timeScaleAux eventAux timeSpanAux index) where
+data TimelineChild index
+  = EventChild (Event index)
+  | TimeSpanChild (TimeSpan index)
+derive instance genericTimelineChild :: Generic (TimelineChild index) _
+instance eqTimelineChild :: Eq index => Eq (TimelineChild index) where
   eq = genericEq
--- | Only compares on `startIndex` of TimeSpan - not a true ordering!
-instance ordTimelineChild :: ( RowToList (timeIndex :: index | eventAux) t1
-                             , OrdRecord t1 (timeIndex :: index | eventAux)
-                             , RowToList ( startIndex :: index, stopIndex :: index
-                                         , timeSpace :: Maybe (TimeSpaceDecided timeSpaceAux timelineAux timeScaleAux eventAux timeSpanAux) | timeSpanAux) t2
-                             , OrdRecord t2 ( startIndex :: index, stopIndex :: index
-                                            , timeSpace :: Maybe (TimeSpaceDecided timeSpaceAux timelineAux timeScaleAux eventAux timeSpanAux) | timeSpanAux)
-                             ) => Ord (TimelineChild timeSpaceAux timelineAux timeScaleAux eventAux timeSpanAux index) where
+instance ordTimelineChild :: Ord index => Ord (TimelineChild index) where
   compare = genericCompare
-  -- compare (EventChild x) (EventChild y) = compare x y
-  -- compare (TimeSpanChild x) (TimeSpanChild y) = compare x y
-  -- compare (EventChild x) (TimeSpanChild y) = LT
-  -- compare (TimeSpanChild y) (EventChild x) = GT
 
 -- | Alias to not confuse this with a TimeIndex
 type TimelineChildNum = Index
 
 -- | A set of Timeline children - events and timespans
-type Timeline timeSpaceAux timelineAux timeScaleAux eventAux timeSpanAux index =
-  { children :: IxSet (TimelineChild timeSpaceAux timelineAux timeScaleAux eventAux timeSpanAux index) -- ^ Mutable reference
-  | timelineAux }
+newtype Timeline index = Timeline
+  { children :: IxSet (TimelineChild index) -- ^ Mutable reference
+  -- non-essential
+  , name :: String
+  , description :: String
+  , document :: String -- TODO markdown
+  -- TODO color
+  }
+derive instance genericTimeline :: Generic (Timeline index) _
+derive newtype instance eqTimeline :: Ord index => Eq (Timeline index)
+derive newtype instance ordTimeline :: Ord index => Ord (Timeline index)
 
 
-insertTimelineChild :: forall timeSpaceAux timelineAux timeScaleAux eventAux timeSpanAux index
-                     . Timeline timeSpaceAux timelineAux timeScaleAux eventAux timeSpanAux index
-                    -> TimelineChild timeSpaceAux timelineAux timeScaleAux eventAux timeSpanAux index
+insertTimelineChild :: forall index
+                     . Timeline index
+                    -> TimelineChild index
                     -> Effect TimelineChildNum
-insertTimelineChild t c = Ix.insert c t.children
+insertTimelineChild (Timeline t) c = Ix.insert c t.children
 
 
-deleteTimelineChild :: forall timeSpaceAux timelineAux timeScaleAux eventAux timeSpanAux index
-                     . Timeline timeSpaceAux timelineAux timeScaleAux eventAux timeSpanAux index
+deleteTimelineChild :: forall index
+                     . Timeline index
                     -> TimelineChildNum
                     -> Effect Unit
-deleteTimelineChild t i = Ix.delete i t.children
+deleteTimelineChild (Timeline t) i = Ix.delete i t.children
 
 
-lookupTimelineChild :: forall timeSpaceAux timelineAux timeScaleAux eventAux timeSpanAux index
-                     . Timeline timeSpaceAux timelineAux timeScaleAux eventAux timeSpanAux index
+lookupTimelineChild :: forall index
+                     . Timeline index
                     -> TimelineChildNum
-                    -> Effect (Maybe (TimelineChild timeSpaceAux timelineAux timeScaleAux eventAux timeSpanAux index))
-lookupTimelineChild t i = Ix.lookup i t.children
+                    -> Effect (Maybe (TimelineChild index))
+lookupTimelineChild (Timeline t) i = Ix.lookup i t.children
 
 
 -- ------------------ Event
 
 -- | A punctuated event in time
-type Event eventAux index =
+newtype Event index = Event
   { timeIndex :: index
-  | eventAux }
+  -- non-essential
+  , name :: String
+  , description :: String
+  , document :: String -- TODO markdown
+  -- TODO color
+  }
+derive instance genericEvent :: Generic (Event index) _
+derive newtype instance eqEvent :: Eq index => Eq (Event index)
+derive newtype instance ordEvent :: Ord index => Ord (Event index)
 
 -- | **Note**: Does not check for surrounding bounds
-moveEvent :: forall eventAux index. Event eventAux index -> index -> Event eventAux index
-moveEvent x i = x {timeIndex = i}
+moveEvent :: forall index. Event index -> index -> Event index
+moveEvent (Event x) i = Event x {timeIndex = i}
 
 -- | **Note**: Does not check for surrounding bounds. Assumes value increases left-to-right
-shiftLeftEvent :: forall eventAux index
+shiftLeftEvent :: forall index
                 . Ring index
-               => Event eventAux index -> index
-               -> Event eventAux index
-shiftLeftEvent x i = x {timeIndex = x.timeIndex - i}
+               => Event index -> index
+               -> Event index
+shiftLeftEvent (Event x) i = Event x {timeIndex = x.timeIndex - i}
 
 -- | **Note**: Does not check for surrounding bounds. Assumes value increases left-to-right
-shiftRightEvent :: forall eventAux index
+shiftRightEvent :: forall index
                  . Semiring index
-                => Event eventAux index -> index
-                -> Event eventAux index
-shiftRightEvent x i = x {timeIndex = x.timeIndex + i}
+                => Event index -> index
+                -> Event index
+shiftRightEvent (Event x) i = Event x {timeIndex = x.timeIndex + i}
 
 
 
 -- ------------------ TimeSpan
 
 -- | An event that lasts over some period of time, optionally containing its own time space (to be seen as a magnification of that period)
-newtype TimeSpan timeSpaceAux timelineAux timeScaleAux eventAux timeSpanAux index = TimeSpan
+newtype TimeSpan index = TimeSpan
   { startIndex :: index
   , stopIndex :: index
-  , timeSpace :: Maybe (TimeSpaceDecided timeSpaceAux timelineAux timeScaleAux eventAux timeSpanAux)
-  | timeSpanAux }
-derive instance genericTimeSpan :: Generic (TimeSpan timeSpaceAux timelineAux timeScaleAux eventAux timeSpanAux index) _
-derive newtype instance eqTimeSpan :: ( RowToList ( startIndex :: index, stopIndex :: index
-                                                  , timeSpace :: Maybe (TimeSpaceDecided timeSpaceAux timelineAux timeScaleAux eventAux timeSpanAux) | timeSpanAux) t1
-                                      , EqRecord t1 ( startIndex :: index, stopIndex :: index
-                                                    , timeSpace :: Maybe (TimeSpaceDecided timeSpaceAux timelineAux timeScaleAux eventAux timeSpanAux) | timeSpanAux)
-                                      ) => Eq (TimeSpan timeSpaceAux timelineAux timeScaleAux eventAux timeSpanAux index)
-derive newtype instance ordTimeSpan :: ( RowToList ( startIndex :: index, stopIndex :: index
-                                                   , timeSpace :: Maybe (TimeSpaceDecided timeSpaceAux timelineAux timeScaleAux eventAux timeSpanAux) | timeSpanAux) t1
-                                       , OrdRecord t1 ( startIndex :: index, stopIndex :: index
-                                                      , timeSpace :: Maybe (TimeSpaceDecided timeSpaceAux timelineAux timeScaleAux eventAux timeSpanAux) | timeSpanAux)
-                                       ) => Ord (TimeSpan timeSpaceAux timelineAux timeScaleAux eventAux timeSpanAux index)
+  , timeSpace :: Maybe TimeSpaceDecided
+  -- non-essential
+  , name :: String
+  , description :: String
+  , document :: String -- TODO markdown
+  -- TODO color
+  }
+derive instance genericTimeSpan :: Generic (TimeSpan index) _
+derive newtype instance eqTimeSpan :: Eq index => Eq (TimeSpan index)
+derive newtype instance ordTimeSpan :: Ord index => Ord (TimeSpan index)
 
 
 -- | **Note**: Does not check for surrounding bounds
-moveTimeSpanStart :: forall timeSpaceAux timelineAux timeScaleAux eventAux timeSpanAux index
-                   . TimeSpan timeSpaceAux timelineAux timeScaleAux eventAux timeSpanAux index -> index
-                  -> TimeSpan timeSpaceAux timelineAux timeScaleAux eventAux timeSpanAux index
+moveTimeSpanStart :: forall index
+                   . TimeSpan index -> index
+                  -> TimeSpan index
 moveTimeSpanStart (TimeSpan x) i = TimeSpan x {startIndex = i}
 
 -- | **Note**: Does not check for surrounding bounds
-moveTimeSpanStop :: forall timeSpaceAux timelineAux timeScaleAux eventAux timeSpanAux index
-                   . TimeSpan timeSpaceAux timelineAux timeScaleAux eventAux timeSpanAux index -> index
-                  -> TimeSpan timeSpaceAux timelineAux timeScaleAux eventAux timeSpanAux index
+moveTimeSpanStop :: forall index
+                   . TimeSpan index -> index
+                  -> TimeSpan index
 moveTimeSpanStop (TimeSpan x) i = TimeSpan x {stopIndex = i}
 
 -- | **Note**: Does not check for surrounding bounds. Assumes value increases left-to-right
-shiftLeftTimeSpan :: forall timeSpaceAux timelineAux timeScaleAux eventAux timeSpanAux index
+shiftLeftTimeSpan :: forall index
                    . Ring index
-                  => TimeSpan timeSpaceAux timelineAux timeScaleAux eventAux timeSpanAux index -> index
-                  -> TimeSpan timeSpaceAux timelineAux timeScaleAux eventAux timeSpanAux index
+                  => TimeSpan index -> index
+                  -> TimeSpan index
 shiftLeftTimeSpan (TimeSpan x) i = TimeSpan x {startIndex = x.startIndex - i, stopIndex = x.stopIndex - i}
 
 -- | **Note**: Does not check for surrounding bounds. Assumes value increases left-to-right
-shiftRightTimeSpan :: forall timeSpaceAux timelineAux timeScaleAux eventAux timeSpanAux index
+shiftRightTimeSpan :: forall index
                     . Semiring index
-                   => TimeSpan timeSpaceAux timelineAux timeScaleAux eventAux timeSpanAux index -> index
-                   -> TimeSpan timeSpaceAux timelineAux timeScaleAux eventAux timeSpanAux index
+                   => TimeSpan index -> index
+                   -> TimeSpan index
 shiftRightTimeSpan (TimeSpan x) i = TimeSpan x {startIndex = x.startIndex + i, stopIndex = x.stopIndex + i}
 
