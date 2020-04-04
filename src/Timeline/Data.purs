@@ -8,6 +8,7 @@ import Data.IxSet (IxSet, Index)
 import Data.IxSet (insert, delete, lookup) as Ix
 import Data.Generic.Rep (class Generic)
 import Data.Generic.Rep.Eq (genericEq)
+import Data.Generic.Rep.Ord (genericCompare)
 import Effect (Effect)
 import Prim.RowList (class RowToList)
 
@@ -59,6 +60,14 @@ instance eqTimeSpaceDecided :: ( RowToList ( timeScale :: TimeScale timeScaleAux
                                              , timelines :: IxSet (Timeline timeSpaceAux timelineAux timeScaleAux eventAux timeSpanAux Number) | timeSpaceAux)
                                ) => Eq (TimeSpaceDecided timeSpaceAux timelineAux timeScaleAux eventAux timeSpanAux) where
   eq = genericEq
+instance ordTimeSpaceDecided :: ( RowToList ( timeScale :: TimeScale timeScaleAux Number
+                                            , timelines :: IxSet (Timeline timeSpaceAux timelineAux timeScaleAux eventAux timeSpanAux Number) | timeSpaceAux) t1
+                                , OrdRecord t1 ( timeScale :: TimeScale timeScaleAux Number
+                                               , timelines :: IxSet (Timeline timeSpaceAux timelineAux timeScaleAux eventAux timeSpanAux Number) | timeSpaceAux)
+                                ) => Ord (TimeSpaceDecided timeSpaceAux timelineAux timeScaleAux eventAux timeSpanAux) where
+  compare = genericCompare
+
+
 -- TODO morphisms between decided types
 
 
@@ -106,10 +115,11 @@ instance ordTimelineChild :: ( RowToList (timeIndex :: index | eventAux) t1
                              , OrdRecord t2 ( startIndex :: index, stopIndex :: index
                                             , timeSpace :: Maybe (TimeSpaceDecided timeSpaceAux timelineAux timeScaleAux eventAux timeSpanAux) | timeSpanAux)
                              ) => Ord (TimelineChild timeSpaceAux timelineAux timeScaleAux eventAux timeSpanAux index) where
-  compare (EventChild x) (EventChild y) = compare x y
-  compare (TimeSpanChild x) (TimeSpanChild y) = compare x y
-  compare (EventChild x) (TimeSpanChild y) = LT
-  compare (TimeSpanChild y) (EventChild x) = GT
+  compare = genericCompare
+  -- compare (EventChild x) (EventChild y) = compare x y
+  -- compare (TimeSpanChild x) (TimeSpanChild y) = compare x y
+  -- compare (EventChild x) (TimeSpanChild y) = LT
+  -- compare (TimeSpanChild y) (EventChild x) = GT
 
 -- | Alias to not confuse this with a TimeIndex
 type TimelineChildNum = Index
