@@ -64,7 +64,7 @@ instance eqTimeSpaceDecided :: ( RowToList ( timeScale :: TimeScale timeScaleAux
                                              , timelines :: IxSet (Timeline timeSpaceAux timelineAux timeScaleAux eventAux timeSpanAux Number) | timeSpaceAux)
                                ) => Eq (TimeSpaceDecided timeSpaceAux timelineAux timeScaleAux eventAux timeSpanAux) where
   eq = genericEq
-
+-- TODO morphisms between decided types
 
 
 -- ------------------ TimeScale
