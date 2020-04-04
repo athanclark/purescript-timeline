@@ -2,6 +2,7 @@ module Timeline.Data where
 
 import Prelude
 import Data.Eq (class EqRecord)
+import Data.Ord (class OrdRecord)
 import Data.Maybe (Maybe)
 import Data.IxSet (IxSet, Index)
 import Data.IxSet (insert, delete, lookup) as Ix
@@ -97,6 +98,18 @@ instance eqTimelineChild :: ( RowToList (timeIndex :: index | eventAux) t1
                                           , timeSpace :: Maybe (TimeSpaceDecided timeSpaceAux timelineAux timeScaleAux eventAux timeSpanAux) | timeSpanAux)
                             ) => Eq (TimelineChild timeSpaceAux timelineAux timeScaleAux eventAux timeSpanAux index) where
   eq = genericEq
+-- | Only compares on `startIndex` of TimeSpan - not a true ordering!
+instance ordTimelineChild :: ( RowToList (timeIndex :: index | eventAux) t1
+                             , OrdRecord t1 (timeIndex :: index | eventAux)
+                             , RowToList ( startIndex :: index, stopIndex :: index
+                                         , timeSpace :: Maybe (TimeSpaceDecided timeSpaceAux timelineAux timeScaleAux eventAux timeSpanAux) | timeSpanAux) t2
+                             , OrdRecord t2 ( startIndex :: index, stopIndex :: index
+                                            , timeSpace :: Maybe (TimeSpaceDecided timeSpaceAux timelineAux timeScaleAux eventAux timeSpanAux) | timeSpanAux)
+                             ) => Ord (TimelineChild timeSpaceAux timelineAux timeScaleAux eventAux timeSpanAux index) where
+  compare (EventChild x) (EventChild y) = compare x y
+  compare (TimeSpanChild x) (TimeSpanChild y) = compare x y
+  compare (EventChild x) (TimeSpanChild y) = LT
+  compare (TimeSpanChild y) (EventChild x) = GT
 
 -- | Alias to not confuse this with a TimeIndex
 type TimelineChildNum = Index
