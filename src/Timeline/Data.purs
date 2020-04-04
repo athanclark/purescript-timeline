@@ -181,36 +181,47 @@ shiftRightEvent x i = x {timeIndex = x.timeIndex + i}
 -- ------------------ TimeSpan
 
 -- | An event that lasts over some period of time, optionally containing its own time space (to be seen as a magnification of that period)
-type TimeSpan timeSpaceAux timelineAux timeScaleAux eventAux timeSpanAux index =
+newtype TimeSpan timeSpaceAux timelineAux timeScaleAux eventAux timeSpanAux index = TimeSpan
   { startIndex :: index
   , stopIndex :: index
   , timeSpace :: Maybe (TimeSpaceDecided timeSpaceAux timelineAux timeScaleAux eventAux timeSpanAux)
   | timeSpanAux }
+derive instance genericTimeSpan :: Generic (TimeSpan timeSpaceAux timelineAux timeScaleAux eventAux timeSpanAux index) _
+derive newtype instance eqTimeSpan :: ( RowToList ( startIndex :: index, stopIndex :: index
+                                                  , timeSpace :: Maybe (TimeSpaceDecided timeSpaceAux timelineAux timeScaleAux eventAux timeSpanAux) | timeSpanAux) t1
+                                      , EqRecord t1 ( startIndex :: index, stopIndex :: index
+                                                    , timeSpace :: Maybe (TimeSpaceDecided timeSpaceAux timelineAux timeScaleAux eventAux timeSpanAux) | timeSpanAux)
+                                      ) => Eq (TimeSpan timeSpaceAux timelineAux timeScaleAux eventAux timeSpanAux index)
+derive newtype instance ordTimeSpan :: ( RowToList ( startIndex :: index, stopIndex :: index
+                                                   , timeSpace :: Maybe (TimeSpaceDecided timeSpaceAux timelineAux timeScaleAux eventAux timeSpanAux) | timeSpanAux) t1
+                                       , OrdRecord t1 ( startIndex :: index, stopIndex :: index
+                                                      , timeSpace :: Maybe (TimeSpaceDecided timeSpaceAux timelineAux timeScaleAux eventAux timeSpanAux) | timeSpanAux)
+                                       ) => Ord (TimeSpan timeSpaceAux timelineAux timeScaleAux eventAux timeSpanAux index)
 
 
 -- | **Note**: Does not check for surrounding bounds
 moveTimeSpanStart :: forall timeSpaceAux timelineAux timeScaleAux eventAux timeSpanAux index
                    . TimeSpan timeSpaceAux timelineAux timeScaleAux eventAux timeSpanAux index -> index
                   -> TimeSpan timeSpaceAux timelineAux timeScaleAux eventAux timeSpanAux index
-moveTimeSpanStart x i = x {startIndex = i}
+moveTimeSpanStart (TimeSpan x) i = TimeSpan x {startIndex = i}
 
 -- | **Note**: Does not check for surrounding bounds
 moveTimeSpanStop :: forall timeSpaceAux timelineAux timeScaleAux eventAux timeSpanAux index
                    . TimeSpan timeSpaceAux timelineAux timeScaleAux eventAux timeSpanAux index -> index
                   -> TimeSpan timeSpaceAux timelineAux timeScaleAux eventAux timeSpanAux index
-moveTimeSpanStop x i = x {stopIndex = i}
+moveTimeSpanStop (TimeSpan x) i = TimeSpan x {stopIndex = i}
 
 -- | **Note**: Does not check for surrounding bounds. Assumes value increases left-to-right
 shiftLeftTimeSpan :: forall timeSpaceAux timelineAux timeScaleAux eventAux timeSpanAux index
                    . Ring index
                   => TimeSpan timeSpaceAux timelineAux timeScaleAux eventAux timeSpanAux index -> index
                   -> TimeSpan timeSpaceAux timelineAux timeScaleAux eventAux timeSpanAux index
-shiftLeftTimeSpan x i = x {startIndex = x.startIndex - i, stopIndex = x.stopIndex - i}
+shiftLeftTimeSpan (TimeSpan x) i = TimeSpan x {startIndex = x.startIndex - i, stopIndex = x.stopIndex - i}
 
 -- | **Note**: Does not check for surrounding bounds. Assumes value increases left-to-right
 shiftRightTimeSpan :: forall timeSpaceAux timelineAux timeScaleAux eventAux timeSpanAux index
                     . Semiring index
                    => TimeSpan timeSpaceAux timelineAux timeScaleAux eventAux timeSpanAux index -> index
                    -> TimeSpan timeSpaceAux timelineAux timeScaleAux eventAux timeSpanAux index
-shiftRightTimeSpan x i = x {startIndex = x.startIndex + i, stopIndex = x.stopIndex + i}
+shiftRightTimeSpan (TimeSpan x) i = TimeSpan x {startIndex = x.startIndex + i, stopIndex = x.stopIndex + i}
 
