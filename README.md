@@ -1,5 +1,7 @@
 # purescript-timeline
 
+[![Build Status](https://travis-ci.org/openchronology/purescript-timeline.svg?branch=master)](https://travis-ci.org/openchronology/purescript-timeline)
+
 This project defines the types and operations used in a timeline, while trying to focus only on the operational aspects of
 the associated types, and not user-interface associated data like documents and descriptions.
 
