@@ -16,6 +16,7 @@
     "purescript-arraybuffer-class": "^0.2.4"
   },
   "devDependencies": {
-    "purescript-psci-support": "^4.0.0"
+    "purescript-psci-support": "^4.0.0",
+    "purescript-spec": "^4.0.1"
   }
 }

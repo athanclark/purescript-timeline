@@ -1,9 +1,28 @@
-module Timeline.Data where
+module Timeline.Data
+  ( TimeSpan (..)
+  , moveTimeSpanStart, moveTimeSpanStop
+  , shiftLeftTimeSpan, shiftRightTimeSpan
+  , Event (..)
+  , moveEvent, shiftLeftEvent, shiftRightEvent
+  , TimelineChild (..)
+  , TimelineChildNum
+  , Timeline (..)
+  , insertTimelineChild, deleteTimelineChild, lookupTimelineChild
+  , TimeScale (..)
+  , changeTimeScaleBegin, changeTimeScaleEnd
+  , TimelineNum
+  , TimeSpace (..)
+  , insertTimeline, deleteTimeline, lookupTimeline
+  , TimeSpaceDecided (..)
+  ) where
 
 import Prelude
-import Data.Maybe (Maybe)
+import Data.Maybe (Maybe (..))
+import Data.Enum (toEnumWithDefaults)
+import Data.String.CodeUnits (fromCharArray)
+import Data.NonEmpty (NonEmpty (..))
 import Data.IxSet.Int (IxSet, Index, decodeJsonIxSet)
-import Data.IxSet.Int (insert, delete, lookup) as Ix
+import Data.IxSet.Int (insert, delete, lookup, fromArray) as Ix
 import Data.Generic.Rep (class Generic)
 import Data.Generic.Rep.Eq (genericEq)
 import Data.Generic.Rep.Ord (genericCompare)
@@ -11,6 +30,8 @@ import Data.Argonaut (class EncodeJson, class DecodeJson, decodeJson, (.:), (:=)
 import Control.Alternative ((<|>))
 import Effect (Effect)
 import Effect.Unsafe (unsafePerformEffect)
+import Test.QuickCheck (class Arbitrary, arbitrary)
+import Test.QuickCheck.Gen (Gen, chooseInt, arrayOf, oneOf, sized, resize)
 
 
 
@@ -43,6 +64,17 @@ instance decodeJsonTimeSpace :: DecodeJson index => DecodeJson (TimeSpace index)
     title <- o .: "title"
     description <- o .: "description"
     document <- o .: "document"
+    pure (TimeSpace {timeScale,timelines,title,description,document})
+instance arbitraryTimeSpace :: Arbitrary index => Arbitrary (TimeSpace index) where
+  arbitrary = do
+    timeScale <- arbitrary
+    timelinesArray <- arbitrary
+    let timelines = unsafePerformEffect do
+          {set} <- Ix.fromArray timelinesArray
+          pure set
+    title <- genString
+    description <- genString
+    document <- genString
     pure (TimeSpace {timeScale,timelines,title,description,document})
 
 -- | Alias to not confuse this with a TimeIndex
@@ -87,6 +119,11 @@ instance decodeJsonTimeSpaceDecided :: DecodeJson TimeSpaceDecided where
     o <- decodeJson json
     let decodeNumber = TimeSpaceNumber <$> o .: "number"
     decodeNumber
+instance arbitraryTimeSpaceDecided :: Arbitrary TimeSpaceDecided where
+  arbitrary =
+    oneOf $ NonEmpty
+      (TimeSpaceNumber <$> arbitrary)
+      []
 
 
 -- TODO morphisms between decided types
@@ -96,20 +133,29 @@ instance decodeJsonTimeSpaceDecided :: DecodeJson TimeSpaceDecided where
 
 -- | Parameters for defining how time is represented spatially and numerically
 newtype TimeScale index = TimeScale
-  { beginIndex :: index
-  , endIndex   :: index
+  { beginIndex  :: index
+  , endIndex    :: index
   -- TODO human <-> presented interpolation
   -- non-essential
-  , timeScaleName :: String
-  , description   :: String
-  , units         :: String
-  , document      :: Maybe String -- TODO markdown
+  , name        :: String
+  , description :: String
+  , units       :: String
+  , document    :: Maybe String -- TODO markdown
   }
 derive instance genericTimeScale :: Generic (TimeScale index) _
 derive newtype instance eqTimeScale :: Eq index => Eq (TimeScale index)
 derive newtype instance ordTimeScale :: Ord index => Ord (TimeScale index)
 derive newtype instance encodeJsonTimeScale :: EncodeJson index => EncodeJson (TimeScale index)
 derive newtype instance decodeJsonTimeScale :: DecodeJson index => DecodeJson (TimeScale index)
+instance arbitraryTimeScale :: Arbitrary index => Arbitrary (TimeScale index) where
+  arbitrary = do
+    beginIndex <- arbitrary
+    endIndex <- arbitrary
+    name <- genString
+    description <- genString
+    units <- genString
+    document <- oneOf (NonEmpty (pure Nothing) [Just <$> genString])
+    pure (TimeScale {beginIndex,endIndex,name,description,units,document})
 
 changeTimeScaleBegin :: forall index
                       . TimeScale index -> index
@@ -144,17 +190,20 @@ instance decodeJsonTimelineChild :: DecodeJson index => DecodeJson (TimelineChil
     let decodeEvent = EventChild <$> o .: "event"
         decodeTimeSpan = TimeSpanChild <$> o .: "timeSpan"
     decodeEvent <|> decodeTimeSpan
+instance arbitraryTimelineChild :: Arbitrary index => Arbitrary (TimelineChild index) where
+  arbitrary =
+    oneOf (NonEmpty (EventChild <$> arbitrary) [TimeSpanChild <$> arbitrary])
 
 -- | Alias to not confuse this with a TimeIndex
 type TimelineChildNum = Index
 
 -- | A set of Timeline children - events and timespans
 newtype Timeline index = Timeline
-  { children :: IxSet (TimelineChild index) -- ^ Mutable reference
+  { children    :: IxSet (TimelineChild index) -- ^ Mutable reference
   -- non-essential
-  , name :: String
+  , name        :: String
   , description :: String
-  , document :: String -- TODO markdown
+  , document    :: String -- TODO markdown
   -- TODO color
   }
 derive instance genericTimeline :: Generic (Timeline index) _
@@ -171,6 +220,16 @@ instance decodeJsonTimeline :: DecodeJson index => DecodeJson (Timeline index) w
     name <- o .: "name"
     description <- o .: "description"
     document <- o .: "document"
+    pure (Timeline {children,name,description,document})
+instance arbitraryTimeline :: Arbitrary index => Arbitrary (Timeline index) where
+  arbitrary = do
+    childrenArray <- arbitrary
+    let children = unsafePerformEffect do
+          {set} <- Ix.fromArray childrenArray
+          pure set
+    name <- genString
+    description <- genString
+    document <- genString
     pure (Timeline {children,name,description,document})
 
 
@@ -199,11 +258,11 @@ lookupTimelineChild (Timeline t) i = Ix.lookup i t.children
 
 -- | A punctuated event in time
 newtype Event index = Event
-  { timeIndex :: index
+  { timeIndex   :: index
   -- non-essential
-  , name :: String
+  , name        :: String
   , description :: String
-  , document :: String -- TODO markdown
+  , document    :: String -- TODO markdown
   -- TODO color
   }
 derive instance genericEvent :: Generic (Event index) _
@@ -211,6 +270,13 @@ derive newtype instance eqEvent :: Eq index => Eq (Event index)
 derive newtype instance ordEvent :: Ord index => Ord (Event index)
 derive newtype instance encodeJsonEvent :: EncodeJson index => EncodeJson (Event index)
 derive newtype instance decodeJsonEvent :: DecodeJson index => DecodeJson (Event index)
+instance arbitraryEvent :: Arbitrary index => Arbitrary (Event index) where
+  arbitrary = do
+    timeIndex <- arbitrary
+    name <- genString
+    description <- genString
+    document <- genString
+    pure (Event {timeIndex,name,description,document})
 
 -- | **Note**: Does not check for surrounding bounds
 moveEvent :: forall index. Event index -> index -> Event index
@@ -236,13 +302,13 @@ shiftRightEvent (Event x) i = Event x {timeIndex = x.timeIndex + i}
 
 -- | An event that lasts over some period of time, optionally containing its own time space (to be seen as a magnification of that period)
 newtype TimeSpan index = TimeSpan
-  { startIndex :: index
-  , stopIndex :: index
-  , timeSpace :: Maybe TimeSpaceDecided
+  { startIndex  :: index
+  , stopIndex   :: index
+  , timeSpace   :: Maybe TimeSpaceDecided
   -- non-essential
-  , name :: String
+  , name        :: String
   , description :: String
-  , document :: String -- TODO markdown
+  , document    :: String -- TODO markdown
   -- TODO color
   }
 derive instance genericTimeSpan :: Generic (TimeSpan index) _
@@ -250,6 +316,17 @@ derive newtype instance eqTimeSpan :: Eq index => Eq (TimeSpan index)
 derive newtype instance ordTimeSpan :: Ord index => Ord (TimeSpan index)
 derive newtype instance encodeJsonTimeSpan :: EncodeJson index => EncodeJson (TimeSpan index)
 derive newtype instance decodeJsonTimeSpan :: DecodeJson index => DecodeJson (TimeSpan index)
+instance arbitraryTimeSpan :: Arbitrary index => Arbitrary (TimeSpan index) where
+  arbitrary = do
+    startIndex <- arbitrary
+    stopIndex <- arbitrary
+    timeSpace <-
+      let subtree = sized \s -> resize (s `div` 2) arbitrary
+      in  oneOf (NonEmpty (pure Nothing) [Just <$> subtree])
+    name <- genString
+    description <- genString
+    document <- genString
+    pure (TimeSpan {startIndex,stopIndex,timeSpace,name,description,document})
 
 
 -- | **Note**: Does not check for surrounding bounds
@@ -278,3 +355,15 @@ shiftRightTimeSpan :: forall index
                    -> TimeSpan index
 shiftRightTimeSpan (TimeSpan x) i = TimeSpan x {startIndex = x.startIndex + i, stopIndex = x.stopIndex + i}
 
+
+
+
+-- --------------- Arbitrary Strings
+
+genChar :: Gen Char
+genChar = toEnumWithDefaults bottom top <$> withoutControlSeq
+  where
+    withoutControlSeq = chooseInt 0 (0xD800 - 1) <|> chooseInt (0xDFFF + 1) 65536
+
+genString :: Gen String
+genString = fromCharArray <$> arrayOf genChar
