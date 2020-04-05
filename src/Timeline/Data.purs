@@ -21,12 +21,16 @@ import Data.Maybe (Maybe (..))
 import Data.Enum (toEnumWithDefaults)
 import Data.String.CodeUnits (fromCharArray)
 import Data.NonEmpty (NonEmpty (..))
+import Data.Tuple.Nested (type (/\), tuple4, uncurry4)
 import Data.IxSet.Int (IxSet, Index, decodeJsonIxSet)
 import Data.IxSet.Int (insert, delete, lookup, fromArray) as Ix
 import Data.Generic.Rep (class Generic)
 import Data.Generic.Rep.Eq (genericEq)
 import Data.Generic.Rep.Ord (genericCompare)
 import Data.Argonaut (class EncodeJson, class DecodeJson, decodeJson, (.:), (:=), (~>), jsonEmptyObject)
+import Data.ArrayBuffer.Class
+  ( class EncodeArrayBuffer, class DecodeArrayBuffer, class DynamicByteLength
+  , putArrayBuffer, readArrayBuffer, byteLength)
 import Control.Alternative ((<|>))
 import Effect (Effect)
 import Effect.Unsafe (unsafePerformEffect)
@@ -52,6 +56,8 @@ newtype TimeSpace index = TimeSpace
 derive instance genericTimeSpace :: Generic (TimeSpace index) _
 derive newtype instance eqTimeSpace :: Ord index => Eq (TimeSpace index)
 derive newtype instance ordTimeSpace :: Ord index => Ord (TimeSpace index)
+instance functorTimeSpace :: Functor TimeSpace where
+  map f (TimeSpace x) = TimeSpace x {timeScale = map f x.timeScale, timelines = map (map f) x.timelines}
 derive newtype instance encodeJsonTimeSpace :: EncodeJson index => EncodeJson (TimeSpace index)
 instance decodeJsonTimeSpace :: DecodeJson index => DecodeJson (TimeSpace index) where
   decodeJson json = do
@@ -145,6 +151,8 @@ newtype TimeScale index = TimeScale
 derive instance genericTimeScale :: Generic (TimeScale index) _
 derive newtype instance eqTimeScale :: Eq index => Eq (TimeScale index)
 derive newtype instance ordTimeScale :: Ord index => Ord (TimeScale index)
+instance functorTimeScale :: Functor TimeScale where
+  map f (TimeScale x) = TimeScale x {beginIndex = f x.beginIndex, endIndex = f x.endIndex}
 derive newtype instance encodeJsonTimeScale :: EncodeJson index => EncodeJson (TimeScale index)
 derive newtype instance decodeJsonTimeScale :: DecodeJson index => DecodeJson (TimeScale index)
 instance arbitraryTimeScale :: Arbitrary index => Arbitrary (TimeScale index) where
@@ -180,6 +188,10 @@ instance eqTimelineChild :: Eq index => Eq (TimelineChild index) where
   eq = genericEq
 instance ordTimelineChild :: Ord index => Ord (TimelineChild index) where
   compare = genericCompare
+instance functorTimelineChild :: Functor TimelineChild where
+  map f x = case x of
+    EventChild y -> EventChild (map f y)
+    TimeSpanChild y -> TimeSpanChild (map f y)
 instance encodeJsonTimelineChild :: EncodeJson index => EncodeJson (TimelineChild index) where
   encodeJson x = case x of
     EventChild y -> "event" := y ~> jsonEmptyObject
@@ -209,6 +221,8 @@ newtype Timeline index = Timeline
 derive instance genericTimeline :: Generic (Timeline index) _
 derive newtype instance eqTimeline :: Ord index => Eq (Timeline index)
 derive newtype instance ordTimeline :: Ord index => Ord (Timeline index)
+instance functorTimeline :: Functor Timeline where
+  map f (Timeline x) = Timeline x {children = map (map f) x.children}
 derive newtype instance encodeJsonTimeline :: EncodeJson index => EncodeJson (Timeline index)
 instance decodeJsonTimeline :: DecodeJson index => DecodeJson (Timeline index) where
   decodeJson json = do
@@ -268,8 +282,21 @@ newtype Event index = Event
 derive instance genericEvent :: Generic (Event index) _
 derive newtype instance eqEvent :: Eq index => Eq (Event index)
 derive newtype instance ordEvent :: Ord index => Ord (Event index)
+instance functorEvent :: Functor Event where
+  map f (Event x) = Event x {timeIndex = f x.timeIndex}
 derive newtype instance encodeJsonEvent :: EncodeJson index => EncodeJson (Event index)
 derive newtype instance decodeJsonEvent :: DecodeJson index => DecodeJson (Event index)
+instance encodeArrayBufferEvent :: EncodeArrayBuffer index => EncodeArrayBuffer (Event index) where
+  putArrayBuffer b o (Event {timeIndex,name,description,document}) =
+    putArrayBuffer b o (tuple4 timeIndex name description document)
+instance decodeArrayBufferEvent :: (DecodeArrayBuffer index, DynamicByteLength index) => DecodeArrayBuffer (Event index) where
+  readArrayBuffer b o =
+    let go :: _ /\ _ /\ _ /\ _ /\ Unit -> Event index
+        go = uncurry4 \timeIndex name description document -> Event {timeIndex,name,description,document}
+    in  map go <$> readArrayBuffer b o
+instance dynamicByteLengthEvent :: DynamicByteLength index => DynamicByteLength (Event index) where
+  byteLength (Event {timeIndex,name,description,document}) =
+    byteLength (tuple4 timeIndex name description document)
 instance arbitraryEvent :: Arbitrary index => Arbitrary (Event index) where
   arbitrary = do
     timeIndex <- arbitrary
@@ -314,8 +341,11 @@ newtype TimeSpan index = TimeSpan
 derive instance genericTimeSpan :: Generic (TimeSpan index) _
 derive newtype instance eqTimeSpan :: Eq index => Eq (TimeSpan index)
 derive newtype instance ordTimeSpan :: Ord index => Ord (TimeSpan index)
+instance functorTimeSpan :: Functor TimeSpan where
+  map f (TimeSpan x) = TimeSpan x {startIndex = f x.startIndex, stopIndex = f x.stopIndex}
 derive newtype instance encodeJsonTimeSpan :: EncodeJson index => EncodeJson (TimeSpan index)
 derive newtype instance decodeJsonTimeSpan :: DecodeJson index => DecodeJson (TimeSpan index)
+-- instance encodeArrayBufferTimeSpan :: 
 instance arbitraryTimeSpan :: Arbitrary index => Arbitrary (TimeSpan index) where
   arbitrary = do
     startIndex <- arbitrary

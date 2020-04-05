@@ -3,9 +3,8 @@ module Timeline.Data.TimeIndex where
 import Prelude
 import Data.Maybe (Maybe (..))
 import Data.Either (Either (..))
-import Data.Argonaut (Json, encodeJson, decodeJson)
-import Data.ArrayBuffer.Types (ArrayBuffer, ByteOffset, ByteLength)
-import Data.ArrayBuffer.Class (putArrayBuffer, readArrayBuffer)
+import Data.Argonaut (class EncodeJson, class DecodeJson)
+import Data.ArrayBuffer.Class (class EncodeArrayBuffer, class DecodeArrayBuffer)
 import Data.ArrayBuffer.Class.Types (Float64BE (..))
 import Data.Number (fromString) as Num
 import Effect (Effect)
@@ -27,26 +26,23 @@ class PositionedTimeIndex positioned where
   -- | Presenting
   positionedTimeIndexToNumber :: positioned -> Number
 
--- | Methods that time-indexed data will be stored; either in JSON or as binary.
-class StorableTimeIndex storable where
-  -- | Storing as Json
-  storableTimeIndexEncodeJson :: storable -> Json
-  -- | Unpacking from Json
-  storableTimeIndexDecodeJson :: Json -> Either String storable
-  -- | Storing as ArrayBuffer
-  storableTimeIndexPutArrayBuffer :: ArrayBuffer -> ByteOffset -> storable -> Effect (Maybe ByteLength)
-  -- | Unpacking from ArrayBuffer
-  storableTimeIndexReadArrayBuffer :: ArrayBuffer -> ByteOffset -> Effect (Maybe storable)
-
 -- | A complete suite of time indicies, oriented around its most human and lossless form.
 class ( HumanTimeIndex human interface
       , PositionedTimeIndex positioned
-      , StorableTimeIndex storable
-      ) <= TimeIndex human interface positioned storable
-  | human -> interface, human -> storable, human -> positioned where
-  humanToStorableTimeIndex :: human -> storable
-  storableToHumanTimeIndex :: storable -> human
-  humanToPresentableTimeIndex :: human -> positioned
+      , EncodeJson storableJson
+      , DecodeJson storableJson
+      , EncodeArrayBuffer storableArrayBuffer
+      , DecodeArrayBuffer storableArrayBuffer
+      ) <= TimeIndex human interface positioned storableJson storableArrayBuffer
+  | human -> interface
+  , human -> storableJson
+  , human -> storableArrayBuffer
+  , human -> positioned where
+  humanToStorableJson                 :: human -> storableJson
+  humanToStorableArrayBuffer          :: human -> storableArrayBuffer
+  storableJsonToHumanTimeIndex        :: storableJson -> human
+  storableArrayBufferToHumanTimeIndex :: storableArrayBuffer -> human
+  humanToPresentableTimeIndex         :: human -> positioned
 
 
 -- ------------------ Instances
@@ -62,12 +58,9 @@ instance humanTimeIndexNumber :: HumanTimeIndex Number String where
       Just x -> Right x
 instance positionedTimeIndexNumber :: PositionedTimeIndex Number where
   positionedTimeIndexToNumber = identity
-instance storableTimeIndexNumber :: StorableTimeIndex Number where
-  storableTimeIndexEncodeJson = encodeJson
-  storableTimeIndexDecodeJson = decodeJson
-  storableTimeIndexPutArrayBuffer b o x = putArrayBuffer b o (Float64BE x)
-  storableTimeIndexReadArrayBuffer b o = (map (\(Float64BE x) -> x)) <$> readArrayBuffer b o
-instance timeIndexNumber :: TimeIndex Number String Number Number where
-  humanToStorableTimeIndex = identity
-  storableToHumanTimeIndex = identity
+instance timeIndexNumber :: TimeIndex Number String Number Number Float64BE where
+  humanToStorableJson = identity
+  storableJsonToHumanTimeIndex = identity
+  humanToStorableArrayBuffer = Float64BE
+  storableArrayBufferToHumanTimeIndex (Float64BE x) = x
   humanToPresentableTimeIndex = identity
