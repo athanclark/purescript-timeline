@@ -18,12 +18,13 @@ module Timeline.Data
 
 import Prelude
 import Data.Maybe (Maybe (..))
+import Data.Either (Either (..))
 import Data.Enum (toEnumWithDefaults)
 import Data.String.CodeUnits (fromCharArray)
 import Data.NonEmpty (NonEmpty (..))
-import Data.Tuple.Nested (type (/\), tuple4, uncurry4)
+import Data.Tuple.Nested (type (/\), tuple4, uncurry4, tuple5, uncurry5, tuple6, uncurry6)
 import Data.IxSet.Int (IxSet, Index, decodeJsonIxSet)
-import Data.IxSet.Int (insert, delete, lookup, fromArray) as Ix
+import Data.IxSet.Int (insert, delete, lookup, fromArray, toArray) as Ix
 import Data.Generic.Rep (class Generic)
 import Data.Generic.Rep.Eq (genericEq)
 import Data.Generic.Rep.Ord (genericCompare)
@@ -31,6 +32,7 @@ import Data.Argonaut (class EncodeJson, class DecodeJson, decodeJson, (.:), (:=)
 import Data.ArrayBuffer.Class
   ( class EncodeArrayBuffer, class DecodeArrayBuffer, class DynamicByteLength
   , putArrayBuffer, readArrayBuffer, byteLength)
+import Data.ArrayBuffer.Class.Types (Int8 (..), Float64BE (..))
 import Control.Alternative ((<|>))
 import Effect (Effect)
 import Effect.Unsafe (unsafePerformEffect)
@@ -71,6 +73,23 @@ instance decodeJsonTimeSpace :: DecodeJson index => DecodeJson (TimeSpace index)
     description <- o .: "description"
     document <- o .: "document"
     pure (TimeSpace {timeScale,timelines,title,description,document})
+instance encodeArrayBufferTimeSpace :: EncodeArrayBuffer index => EncodeArrayBuffer (TimeSpace index) where
+  putArrayBuffer b o (TimeSpace {timeScale,timelines,title,description,document}) =
+    let timelines' = unsafePerformEffect (Ix.toArray timelines)
+    in  putArrayBuffer b o (tuple5 timeScale timelines' title description document)
+instance decodeArrayBufferTimeSpace :: (DecodeArrayBuffer index, DynamicByteLength index) => DecodeArrayBuffer (TimeSpace index) where
+  readArrayBuffer b o =
+    let go :: _ /\ _ /\ _ /\ _ /\ _ /\ Unit -> TimeSpace index
+        go = uncurry5 \timeScale timelines' title description document ->
+          let timelines = unsafePerformEffect do
+                {set} <- Ix.fromArray timelines'
+                pure set
+          in  TimeSpace {timeScale,timelines,title,description,document}
+    in  map go <$> readArrayBuffer b o
+instance dynamicByteLengthTimeSpace :: DynamicByteLength index => DynamicByteLength (TimeSpace index) where
+  byteLength (TimeSpace {timeScale,timelines,title,description,document}) =
+    let timelines' = unsafePerformEffect (Ix.toArray timelines)
+    in  byteLength (tuple5 timeScale timelines' title description document)
 instance arbitraryTimeSpace :: Arbitrary index => Arbitrary (TimeSpace index) where
   arbitrary = do
     timeScale <- arbitrary
@@ -125,6 +144,32 @@ instance decodeJsonTimeSpaceDecided :: DecodeJson TimeSpaceDecided where
     o <- decodeJson json
     let decodeNumber = TimeSpaceNumber <$> o .: "number"
     decodeNumber
+instance encodeArrayBufferTimeSpaceDecided :: EncodeArrayBuffer TimeSpaceDecided where
+  putArrayBuffer b o x = case x of
+    TimeSpaceNumber y -> do
+      mW <- putArrayBuffer b o (Int8 0)
+      case mW of
+        Nothing -> pure Nothing
+        Just w -> do
+          mW' <- putArrayBuffer b (o + w) (map Float64BE y)
+          case mW' of
+            Nothing -> pure (Just w)
+            Just w' -> pure (Just (w + w'))
+instance decodeArrayBufferTimeSpaceDecided :: DecodeArrayBuffer TimeSpaceDecided where
+  readArrayBuffer b o = do
+    mFlag <- readArrayBuffer b o
+    case mFlag of
+      Nothing -> pure Nothing
+      Just (Int8 f)
+        | f == 0 -> do
+          mX <- readArrayBuffer b (o + 1)
+          case mX of
+            Nothing -> pure Nothing
+            Just x -> pure $ Just $ TimeSpaceNumber $ map (\(Float64BE y) -> y) x
+        | otherwise -> pure Nothing
+instance dynamicByteLengthTimeSpaceDecided :: DynamicByteLength TimeSpaceDecided where
+  byteLength x = map (_ + 1) $ case x of
+    TimeSpaceNumber y -> byteLength (map Float64BE y)
 instance arbitraryTimeSpaceDecided :: Arbitrary TimeSpaceDecided where
   arbitrary =
     oneOf $ NonEmpty
@@ -155,6 +200,17 @@ instance functorTimeScale :: Functor TimeScale where
   map f (TimeScale x) = TimeScale x {beginIndex = f x.beginIndex, endIndex = f x.endIndex}
 derive newtype instance encodeJsonTimeScale :: EncodeJson index => EncodeJson (TimeScale index)
 derive newtype instance decodeJsonTimeScale :: DecodeJson index => DecodeJson (TimeScale index)
+instance encodeArrayBufferTimeScale :: EncodeArrayBuffer index => EncodeArrayBuffer (TimeScale index) where
+  putArrayBuffer b o (TimeScale {beginIndex,endIndex,name,description,units,document}) =
+    putArrayBuffer b o (tuple6 beginIndex endIndex name description units document)
+instance decodeArrayBufferTimeScale :: (DecodeArrayBuffer index, DynamicByteLength index) => DecodeArrayBuffer (TimeScale index) where
+  readArrayBuffer b o =
+    let go :: _ /\ _ /\ _ /\ _ /\ _ /\ _ /\ Unit -> TimeScale index
+        go = uncurry6 \beginIndex endIndex name description units document -> TimeScale {beginIndex,endIndex,name,description,units,document}
+    in  map go <$> readArrayBuffer b o
+instance dynamicByteLengthTimeScale :: DynamicByteLength index => DynamicByteLength (TimeScale index) where
+  byteLength (TimeScale {beginIndex,endIndex,name,description,units,document}) =
+    byteLength (tuple6 beginIndex endIndex name description units document)
 instance arbitraryTimeScale :: Arbitrary index => Arbitrary (TimeScale index) where
   arbitrary = do
     beginIndex <- arbitrary
@@ -202,6 +258,20 @@ instance decodeJsonTimelineChild :: DecodeJson index => DecodeJson (TimelineChil
     let decodeEvent = EventChild <$> o .: "event"
         decodeTimeSpan = TimeSpanChild <$> o .: "timeSpan"
     decodeEvent <|> decodeTimeSpan
+instance encodeArrayBufferTimelineChild :: EncodeArrayBuffer index => EncodeArrayBuffer (TimelineChild index) where
+  putArrayBuffer b o x = putArrayBuffer b o $ case x of
+    EventChild y -> Left y
+    TimeSpanChild y -> Right y
+instance decodeArrayBufferTimelineChild :: (DecodeArrayBuffer index, DynamicByteLength index) => DecodeArrayBuffer (TimelineChild index) where
+  readArrayBuffer b o =
+    let fromEither eX = case eX of
+          Left y -> EventChild y
+          Right y -> TimeSpanChild y
+    in  map fromEither <$> readArrayBuffer b o
+instance dynamicByteLengthTimelineChild :: DynamicByteLength index => DynamicByteLength (TimelineChild index) where
+  byteLength x = byteLength $ case x of
+    EventChild y -> Left y
+    TimeSpanChild y -> Right y
 instance arbitraryTimelineChild :: Arbitrary index => Arbitrary (TimelineChild index) where
   arbitrary =
     oneOf (NonEmpty (EventChild <$> arbitrary) [TimeSpanChild <$> arbitrary])
@@ -235,6 +305,23 @@ instance decodeJsonTimeline :: DecodeJson index => DecodeJson (Timeline index) w
     description <- o .: "description"
     document <- o .: "document"
     pure (Timeline {children,name,description,document})
+instance encodeArrayBufferTimeline :: EncodeArrayBuffer index => EncodeArrayBuffer (Timeline index) where
+  putArrayBuffer b o (Timeline {children,name,description,document}) =
+    let children' = unsafePerformEffect (Ix.toArray children)
+    in  putArrayBuffer b o (tuple4 children' name description document)
+instance decodeArrayBufferTimeline :: (DecodeArrayBuffer index, DynamicByteLength index) => DecodeArrayBuffer (Timeline index) where
+  readArrayBuffer b o =
+    let go :: _ /\ _ /\ _ /\ _ /\ Unit -> Timeline index
+        go = uncurry4 \children' name description document ->
+          let children = unsafePerformEffect do
+                {set} <- Ix.fromArray children'
+                pure set
+          in  Timeline {children,name,description,document}
+    in  map go <$> readArrayBuffer b o
+instance dynamicByteLengthTimeline :: DynamicByteLength index => DynamicByteLength (Timeline index) where
+  byteLength (Timeline {children,name,description,document}) =
+    let children' = unsafePerformEffect (Ix.toArray children)
+    in  byteLength (tuple4 children' name description document)
 instance arbitraryTimeline :: Arbitrary index => Arbitrary (Timeline index) where
   arbitrary = do
     childrenArray <- arbitrary
@@ -345,7 +432,18 @@ instance functorTimeSpan :: Functor TimeSpan where
   map f (TimeSpan x) = TimeSpan x {startIndex = f x.startIndex, stopIndex = f x.stopIndex}
 derive newtype instance encodeJsonTimeSpan :: EncodeJson index => EncodeJson (TimeSpan index)
 derive newtype instance decodeJsonTimeSpan :: DecodeJson index => DecodeJson (TimeSpan index)
--- instance encodeArrayBufferTimeSpan :: 
+instance encodeArrayBufferTimeSpan :: EncodeArrayBuffer index => EncodeArrayBuffer (TimeSpan index) where
+  putArrayBuffer b o (TimeSpan {startIndex,stopIndex,timeSpace,name,description,document}) =
+    putArrayBuffer b o (tuple6 startIndex stopIndex timeSpace name description document)
+instance decodeArrayBufferTimeSpan :: (DecodeArrayBuffer index, DynamicByteLength index) => DecodeArrayBuffer (TimeSpan index) where
+  readArrayBuffer b o =
+    let go :: _ /\ _ /\ _ /\ _ /\ _ /\ _ /\ Unit -> TimeSpan index
+        go = uncurry6 \startIndex stopIndex timeSpace name description document ->
+          TimeSpan {startIndex,stopIndex,timeSpace,name,description,document}
+    in  map go <$> readArrayBuffer b o
+instance dynamicByteLengthTimeSpan :: DynamicByteLength index => DynamicByteLength (TimeSpan index) where
+  byteLength (TimeSpan {startIndex,stopIndex,timeSpace,name,description,document}) =
+    byteLength (tuple6 startIndex stopIndex timeSpace name description document)
 instance arbitraryTimeSpan :: Arbitrary index => Arbitrary (TimeSpan index) where
   arbitrary = do
     startIndex <- arbitrary
