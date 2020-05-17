@@ -5,14 +5,10 @@ module Timeline.Data
   , Event (..)
   , moveEvent, shiftLeftEvent, shiftRightEvent
   , TimelineChild (..)
-  , TimelineChildNum
   , Timeline (..)
-  , insertTimelineChild, deleteTimelineChild, lookupTimelineChild
   , TimeScale (..)
   , changeTimeScaleBegin, changeTimeScaleEnd
-  , TimelineNum
   , TimeSpace (..)
-  , insertTimeline, deleteTimeline, lookupTimeline
   , TimeSpaceDecided (..)
   ) where
 
@@ -23,8 +19,6 @@ import Data.Enum (toEnumWithDefaults)
 import Data.String.CodeUnits (fromCharArray)
 import Data.NonEmpty (NonEmpty (..))
 import Data.Tuple.Nested (type (/\), tuple4, uncurry4, tuple5, uncurry5, tuple6, uncurry6)
-import Data.IxSet.Int (IxSet, Index, decodeJsonIxSet)
-import Data.IxSet.Int (insert, delete, lookup, fromArray, toArray) as Ix
 import Data.Generic.Rep (class Generic)
 import Data.Generic.Rep.Eq (genericEq)
 import Data.Generic.Rep.Ord (genericCompare)
@@ -47,7 +41,7 @@ import Test.QuickCheck.Gen (Gen, chooseInt, arrayOf, oneOf, sized, resize)
 -- | is represented spatially; a time-scale.
 newtype TimeSpace index = TimeSpace
   { timeScale :: TimeScale index
-  , timelines :: IxSet (Timeline index) -- ^ Mutable reference
+  , timelines :: Array (Timeline index)
   -- FIXME add cross-referenced timeline children? Ones that _reference_ multiple timelines, rather than belong to them
   -- non-essential
   , title       :: String
@@ -61,70 +55,27 @@ derive newtype instance ordTimeSpace :: Ord index => Ord (TimeSpace index)
 instance functorTimeSpace :: Functor TimeSpace where
   map f (TimeSpace x) = TimeSpace x {timeScale = map f x.timeScale, timelines = map (map f) x.timelines}
 derive newtype instance encodeJsonTimeSpace :: EncodeJson index => EncodeJson (TimeSpace index)
-instance decodeJsonTimeSpace :: DecodeJson index => DecodeJson (TimeSpace index) where
-  decodeJson json = do
-    o <- decodeJson json
-    timeScale <- o .: "timeScale"
-    timelinesEffect <- o .: "timelines" >>= decodeJsonIxSet
-    let timelines = unsafePerformEffect do
-          {set} <- timelinesEffect
-          pure set
-    title <- o .: "title"
-    description <- o .: "description"
-    document <- o .: "document"
-    pure (TimeSpace {timeScale,timelines,title,description,document})
+derive newtype instance decodeJsonTimeSpace :: DecodeJson index => DecodeJson (TimeSpace index)
 instance encodeArrayBufferTimeSpace :: EncodeArrayBuffer index => EncodeArrayBuffer (TimeSpace index) where
   putArrayBuffer b o (TimeSpace {timeScale,timelines,title,description,document}) =
-    let timelines' = unsafePerformEffect (Ix.toArray timelines)
-    in  putArrayBuffer b o (tuple5 timeScale timelines' title description document)
+    putArrayBuffer b o (tuple5 timeScale timelines title description document)
 instance decodeArrayBufferTimeSpace :: (DecodeArrayBuffer index, DynamicByteLength index) => DecodeArrayBuffer (TimeSpace index) where
   readArrayBuffer b o =
     let go :: _ /\ _ /\ _ /\ _ /\ _ /\ Unit -> TimeSpace index
-        go = uncurry5 \timeScale timelines' title description document ->
-          let timelines = unsafePerformEffect do
-                {set} <- Ix.fromArray timelines'
-                pure set
-          in  TimeSpace {timeScale,timelines,title,description,document}
+        go = uncurry5 \timeScale timelines title description document ->
+          TimeSpace {timeScale,timelines,title,description,document}
     in  map go <$> readArrayBuffer b o
 instance dynamicByteLengthTimeSpace :: DynamicByteLength index => DynamicByteLength (TimeSpace index) where
   byteLength (TimeSpace {timeScale,timelines,title,description,document}) =
-    let timelines' = unsafePerformEffect (Ix.toArray timelines)
-    in  byteLength (tuple5 timeScale timelines' title description document)
+    byteLength (tuple5 timeScale timelines title description document)
 instance arbitraryTimeSpace :: Arbitrary index => Arbitrary (TimeSpace index) where
   arbitrary = do
     timeScale <- arbitrary
-    timelinesArray <- arbitrary
-    let timelines = unsafePerformEffect do
-          {set} <- Ix.fromArray timelinesArray
-          pure set
+    timelines <- arbitrary
     title <- genString
     description <- genString
     document <- genString
     pure (TimeSpace {timeScale,timelines,title,description,document})
-
--- | Alias to not confuse this with a TimeIndex
-type TimelineNum = Index
-
-
-insertTimeline :: forall index
-                . TimeSpace index
-               -> Timeline index
-               -> Effect TimelineNum
-insertTimeline (TimeSpace t) c = Ix.insert c t.timelines
-
-
-deleteTimeline :: forall index
-                . TimeSpace index
-               -> TimelineNum
-               -> Effect Unit
-deleteTimeline (TimeSpace t) i = Ix.delete i t.timelines
-
-
-lookupTimeline :: forall index
-                . TimeSpace index
-               -> TimelineNum
-               -> Effect (Maybe (Timeline index))
-lookupTimeline (TimeSpace t) i = Ix.lookup i t.timelines
 
 
 
@@ -276,12 +227,10 @@ instance arbitraryTimelineChild :: Arbitrary index => Arbitrary (TimelineChild i
   arbitrary =
     oneOf (NonEmpty (EventChild <$> arbitrary) [TimeSpanChild <$> arbitrary])
 
--- | Alias to not confuse this with a TimeIndex
-type TimelineChildNum = Index
 
 -- | A set of Timeline children - events and timespans
 newtype Timeline index = Timeline
-  { children    :: IxSet (TimelineChild index) -- ^ Mutable reference
+  { children    :: Array (TimelineChild index)
   -- non-essential
   , name        :: String
   , description :: String
@@ -294,65 +243,27 @@ derive newtype instance ordTimeline :: Ord index => Ord (Timeline index)
 instance functorTimeline :: Functor Timeline where
   map f (Timeline x) = Timeline x {children = map (map f) x.children}
 derive newtype instance encodeJsonTimeline :: EncodeJson index => EncodeJson (Timeline index)
-instance decodeJsonTimeline :: DecodeJson index => DecodeJson (Timeline index) where
-  decodeJson json = do
-    o <- decodeJson json
-    childrenEffect <- o .: "children" >>= decodeJsonIxSet
-    let children = unsafePerformEffect do
-          {set} <- childrenEffect
-          pure set
-    name <- o .: "name"
-    description <- o .: "description"
-    document <- o .: "document"
-    pure (Timeline {children,name,description,document})
+derive newtype instance decodeJsonTimeline :: DecodeJson index => DecodeJson (Timeline index)
 instance encodeArrayBufferTimeline :: EncodeArrayBuffer index => EncodeArrayBuffer (Timeline index) where
   putArrayBuffer b o (Timeline {children,name,description,document}) =
-    let children' = unsafePerformEffect (Ix.toArray children)
-    in  putArrayBuffer b o (tuple4 children' name description document)
+    putArrayBuffer b o (tuple4 children name description document)
 instance decodeArrayBufferTimeline :: (DecodeArrayBuffer index, DynamicByteLength index) => DecodeArrayBuffer (Timeline index) where
   readArrayBuffer b o =
     let go :: _ /\ _ /\ _ /\ _ /\ Unit -> Timeline index
-        go = uncurry4 \children' name description document ->
-          let children = unsafePerformEffect do
-                {set} <- Ix.fromArray children'
-                pure set
-          in  Timeline {children,name,description,document}
+        go = uncurry4 \children name description document ->
+          Timeline {children,name,description,document}
     in  map go <$> readArrayBuffer b o
 instance dynamicByteLengthTimeline :: DynamicByteLength index => DynamicByteLength (Timeline index) where
   byteLength (Timeline {children,name,description,document}) =
-    let children' = unsafePerformEffect (Ix.toArray children)
-    in  byteLength (tuple4 children' name description document)
+    byteLength (tuple4 children name description document)
 instance arbitraryTimeline :: Arbitrary index => Arbitrary (Timeline index) where
   arbitrary = do
-    childrenArray <- arbitrary
-    let children = unsafePerformEffect do
-          {set} <- Ix.fromArray childrenArray
-          pure set
+    children <- arbitrary
     name <- genString
     description <- genString
     document <- genString
     pure (Timeline {children,name,description,document})
 
-
-insertTimelineChild :: forall index
-                     . Timeline index
-                    -> TimelineChild index
-                    -> Effect TimelineChildNum
-insertTimelineChild (Timeline t) c = Ix.insert c t.children
-
-
-deleteTimelineChild :: forall index
-                     . Timeline index
-                    -> TimelineChildNum
-                    -> Effect Unit
-deleteTimelineChild (Timeline t) i = Ix.delete i t.children
-
-
-lookupTimelineChild :: forall index
-                     . Timeline index
-                    -> TimelineChildNum
-                    -> Effect (Maybe (TimelineChild index))
-lookupTimelineChild (Timeline t) i = Ix.lookup i t.children
 
 
 -- ------------------ Event
