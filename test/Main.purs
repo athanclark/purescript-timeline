@@ -18,7 +18,7 @@ import Effect.Aff (Aff, launchAff_)
 import Effect.Console (log)
 import Effect.Class (liftEffect)
 import Effect.Unsafe (unsafePerformEffect)
-import Test.QuickCheck (class Arbitrary, arbitrary, quickCheck)
+import Test.QuickCheck (class Arbitrary, arbitrary, quickCheck, Result (..))
 import Test.Spec (describe, it, SpecT)
 import Test.Spec.Runner (runSpec', defaultConfig)
 import Test.Spec.Reporter.Console (consoleReporter)
@@ -53,6 +53,7 @@ tests = do
   where
     jsonTest :: forall a
               . Arbitrary a
+             => Show a
              => Eq a
              => EncodeJson a
              => DecodeJson a
@@ -60,6 +61,7 @@ tests = do
     jsonTest name proxy = it name (liftEffect (quickCheck (jsonIso proxy)))
     binaryTest :: forall a
                 . Arbitrary a
+               => Show a
                => Eq a
                => EncodeArrayBuffer a
                => DecodeArrayBuffer a
@@ -70,22 +72,31 @@ tests = do
 
 jsonIso :: forall a
          . Eq a
+        => Show a
         => EncodeJson a
         => DecodeJson a
-        => Proxy a -> a -> Boolean
-jsonIso Proxy x = decodeJson (encodeJson x) == Right x
+        => Proxy a -> a -> Result
+jsonIso Proxy x =
+  let result = decodeJson (encodeJson x)
+  in  if result == Right x
+        then Success
+        else Failed $ "Not equal - original " <> show x <> ", result: " <> show result
 
 
 binaryIso :: forall a
            . Eq a
+          => Show a
           => EncodeArrayBuffer a
           => DecodeArrayBuffer a
           => DynamicByteLength a
-          => Proxy a -> a -> Boolean
+          => Proxy a -> a -> Result
 binaryIso Proxy x = unsafePerformEffect do
   buf <- encodeArrayBuffer x
   mY <- decodeArrayBuffer buf
-  pure (mY == Just x)
+  pure $
+    if mY == Just x
+      then Success
+      else Failed $ "Not equal - original " <> show x <> ", result: " <> show mY
 
 
 newtype BinaryFloat = BinaryFloat Float64BE

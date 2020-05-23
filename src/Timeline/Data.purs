@@ -264,7 +264,7 @@ instance dynamicByteLengthTimeSpan :: DynamicByteLength TimeSpan where
 instance arbitraryTimeSpan :: Arbitrary TimeSpan where
   arbitrary = do
     timeSpace <-
-      let subtree = sized \s -> resize (s `div` 10) arbitrary
+      let subtree = sized \s -> resize (s `div` 2) arbitrary
       in  oneOf (NonEmpty (pure Nothing) [Just <$> subtree])
     name <- genString
     description <- genString
