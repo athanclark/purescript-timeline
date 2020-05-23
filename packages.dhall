@@ -123,6 +123,17 @@ let upstream =
 
 let overrides = {=}
 
-let additions = {=}
+let additions =
+      { indexed-multiset =
+        { dependencies =
+          [ "foreign-object"
+          , "generics-rep"
+          , "ordered-collections"
+          , "parseint"
+          ]
+        , repo = "https://github.com/openchronology/purescript-indexed-multiset.git"
+        , version = "master"
+        }
+      }
 
 in  upstream // overrides // additions

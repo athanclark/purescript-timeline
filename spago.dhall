@@ -6,6 +6,7 @@ You can edit this file as you like.
 , dependencies =
   [ "argonaut"
   , "arraybuffer-class"
+  , "indexed-multiset"
   , "console"
   , "effect"
   , "numbers"

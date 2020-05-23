@@ -1,6 +1,7 @@
 module Test.Main where
 
 import Timeline.Data (TimeSpan, Event, TimelineChild, Timeline, TimeScale, TimeSpace, TimeSpaceDecided)
+import Timeline.Data.TimeComponent (SpanOfTime, InstantOrSpan)
 
 import Prelude
 import Data.Maybe (Maybe (..))
@@ -23,23 +24,28 @@ import Test.Spec.Runner (runSpec', defaultConfig)
 import Test.Spec.Reporter.Console (consoleReporter)
 import Type.Proxy (Proxy (..))
 
+
 main :: Effect Unit
 main = launchAff_ $ runSpec' (defaultConfig {timeout = Nothing}) [consoleReporter] tests
 
 tests :: SpecT Aff Unit Identity Unit
 tests = do
   describe "Json" do
-    jsonTest "TimeSpan" (Proxy :: Proxy (TimeSpan Number))
-    jsonTest "Event" (Proxy :: Proxy (Event Number))
-    jsonTest "TimelineChild" (Proxy :: Proxy (TimelineChild Number))
+    jsonTest "SpanOfTime" (Proxy :: Proxy (SpanOfTime Number))
+    jsonTest "InstantOrSpan" (Proxy :: Proxy (InstantOrSpan Number))
+    jsonTest "TimeSpan" (Proxy :: Proxy TimeSpan)
+    jsonTest "Event" (Proxy :: Proxy Event)
+    jsonTest "TimelineChild" (Proxy :: Proxy TimelineChild)
     jsonTest "Timeline" (Proxy :: Proxy (Timeline Number))
     jsonTest "TimeScale" (Proxy :: Proxy (TimeScale Number))
     jsonTest "TimeSpace" (Proxy :: Proxy (TimeSpace Number))
     jsonTest "TimeSpaceDecided" (Proxy :: Proxy TimeSpaceDecided)
   describe "Binary" do
-    binaryTest "TimeSpan" (Proxy :: Proxy (TimeSpan BinaryFloat))
-    binaryTest "Event" (Proxy :: Proxy (Event BinaryFloat))
-    binaryTest "TimelineChild" (Proxy :: Proxy (TimelineChild BinaryFloat))
+    binaryTest "SpanOfTime" (Proxy :: Proxy (SpanOfTime BinaryFloat))
+    binaryTest "InstantOrSpan" (Proxy :: Proxy (InstantOrSpan BinaryFloat))
+    binaryTest "TimeSpan" (Proxy :: Proxy TimeSpan)
+    binaryTest "Event" (Proxy :: Proxy Event)
+    binaryTest "TimelineChild" (Proxy :: Proxy TimelineChild)
     binaryTest "Timeline" (Proxy :: Proxy (Timeline BinaryFloat))
     binaryTest "TimeScale" (Proxy :: Proxy (TimeScale BinaryFloat))
     binaryTest "TimeSpace" (Proxy :: Proxy (TimeSpace BinaryFloat))
