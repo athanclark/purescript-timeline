@@ -7,7 +7,6 @@ import Data.Argonaut (class EncodeJson, class DecodeJson)
 import Data.ArrayBuffer.Class (class EncodeArrayBuffer, class DecodeArrayBuffer)
 import Data.ArrayBuffer.Class.Types (Float64BE (..))
 import Data.Number (fromString) as Num
-import Effect (Effect)
 
 
 

@@ -6,9 +6,10 @@ You can edit this file as you like.
 , dependencies =
   [ "argonaut"
   , "arraybuffer-class"
-  , "indexed-multiset"
   , "console"
+  , "debug"
   , "effect"
+  , "indexed-multiset"
   , "numbers"
   , "prelude"
   , "psci-support"

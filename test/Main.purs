@@ -5,7 +5,7 @@ import Timeline.Data.TimeComponent (SpanOfTime, InstantOrSpan)
 
 import Prelude
 import Data.Maybe (Maybe (..))
-import Data.Either (Either (Right))
+import Data.Either (Either (..))
 import Data.Generic.Rep (class Generic)
 import Data.Argonaut (class EncodeJson, class DecodeJson, encodeJson, decodeJson)
 import Data.ArrayBuffer.Class
@@ -15,7 +15,6 @@ import Data.ArrayBuffer.Class.Types (Float64BE (..))
 import Data.Identity (Identity)
 import Effect (Effect)
 import Effect.Aff (Aff, launchAff_)
-import Effect.Console (log)
 import Effect.Class (liftEffect)
 import Effect.Unsafe (unsafePerformEffect)
 import Test.QuickCheck (class Arbitrary, arbitrary, quickCheck, Result (..))
@@ -77,10 +76,14 @@ jsonIso :: forall a
         => DecodeJson a
         => Proxy a -> a -> Result
 jsonIso Proxy x =
+  -- trace x \_ ->
   let result = decodeJson (encodeJson x)
-  in  if result == Right x
-        then Success
-        else Failed $ "Not equal - original " <> show x <> ", result: " <> show result
+  in  case result of
+        Left e -> Failed $ "Couldn't parse: " <> e
+        Right y
+          | y == x -> Success
+          | otherwise ->
+              Failed $ "Not equal - original " <> show (show x) <> "\nresult: " <> show (show y)
 
 
 binaryIso :: forall a
@@ -96,7 +99,7 @@ binaryIso Proxy x = unsafePerformEffect do
   pure $
     if mY == Just x
       then Success
-      else Failed $ "Not equal - original " <> show x <> ", result: " <> show mY
+      else Failed $ "Not equal - original " <> show (show x) <> "\nresult: " <> show (show mY)
 
 
 newtype BinaryFloat = BinaryFloat Float64BE

@@ -8,7 +8,7 @@ module Timeline.Data
   , module Timeline.Data.TimeScale
   ) where
 
-import Timeline.Data.TimeComponent (SpanOfTime, InstantOrSpan)
+import Timeline.Data.TimeComponent (SpanOfTime, InstantOrSpan (..))
 import Timeline.Data.Event (Event (..))
 import Timeline.Data.TimeScale (TimeScale (..))
 
@@ -16,14 +16,11 @@ import Prelude
 import Data.Maybe (Maybe (..))
 import Data.Either (Either (..))
 import Data.Tuple (Tuple (..))
-import Data.Tuple.Nested (type (/\), tuple3, uncurry3, tuple4, uncurry4, tuple5, uncurry5, tuple6, uncurry6)
-import Data.Enum (toEnumWithDefaults)
-import Data.String.CodeUnits (fromCharArray)
+import Data.Tuple.Nested (type (/\), tuple4, uncurry4, tuple5, uncurry5)
 import Data.NonEmpty (NonEmpty (..))
 import Data.MultiSet.Indexed (IxMultiSet)
-import Data.MultiSet.Indexed (mapKeys) as IxMultiSet
+import Data.MultiSet.Indexed (mapKeys, fromFoldable) as IxMultiSet
 import Data.Generic.Rep (class Generic)
-import Data.Generic.Rep.Eq (genericEq)
 import Data.Generic.Rep.Ord (genericCompare)
 import Data.Generic.Rep.Show (genericShow)
 import Data.Argonaut (class EncodeJson, class DecodeJson, decodeJson, (.:), (:=), (~>), jsonEmptyObject)
@@ -32,10 +29,8 @@ import Data.ArrayBuffer.Class
   , putArrayBuffer, readArrayBuffer, byteLength)
 import Data.ArrayBuffer.Class.Types (Int8 (..), Float64BE (..))
 import Control.Alternative ((<|>))
-import Effect (Effect)
-import Effect.Unsafe (unsafePerformEffect)
 import Test.QuickCheck (class Arbitrary, arbitrary)
-import Test.QuickCheck.Gen (Gen, chooseInt, arrayOf, oneOf, sized, resize)
+import Test.QuickCheck.Gen (arrayOf, oneOf, sized, resize)
 import Test.QuickCheck.UTF8String (genString)
 
 
@@ -57,7 +52,15 @@ newtype TimeSpace index = TimeSpace
 derive instance genericTimeSpace :: Generic (TimeSpace index) _
 derive newtype instance eqTimeSpace :: Ord index => Eq (TimeSpace index)
 derive newtype instance ordTimeSpace :: Ord index => Ord (TimeSpace index)
-derive newtype instance showTimeSpace :: Show index => Show (TimeSpace index)
+instance showTimeSpace :: Show index => Show (TimeSpace index) where
+  show = genericShow
+  -- show (TimeSpace x) =
+  --   "TimeSpace {timeScale: " <> show x.timeScale
+  --   <> ", timelines: " <> show x.timelines
+  --   <> ", title: " <> show x.title
+  --   <> ", description: " <> show x.description
+  --   <> ", document: " <> show x.document
+  --   <> "}"
 derive newtype instance encodeJsonTimeSpace :: EncodeJson index => EncodeJson (TimeSpace index)
 derive newtype instance decodeJsonTimeSpace :: (DecodeJson index, Ord index) => DecodeJson (TimeSpace index)
 instance encodeArrayBufferTimeSpace :: EncodeArrayBuffer index => EncodeArrayBuffer (TimeSpace index) where
@@ -95,7 +98,7 @@ data TimeSpaceDecided
   = TimeSpaceNumber (TimeSpace Number)
 derive instance genericTimeSpaceDecided :: Generic TimeSpaceDecided _
 instance eqTimeSpaceDecided :: Eq TimeSpaceDecided where
-  eq x y = case Tuple x y of
+  eq x' y' = case Tuple x' y' of
     Tuple (TimeSpaceNumber x) (TimeSpaceNumber y) -> x == y
     _ -> false
 instance ordTimeSpaceDecided :: Ord TimeSpaceDecided where
@@ -153,7 +156,7 @@ data TimelineChild
   | TimeSpanChild TimeSpan
 derive instance genericTimelineChild :: Generic TimelineChild _
 instance eqTimelineChild :: Eq TimelineChild where
-  eq x y = case Tuple x y of
+  eq x' y' = case Tuple x' y' of
     Tuple (EventChild x) (EventChild y) -> x == y
     Tuple (TimeSpanChild x) (TimeSpanChild y) -> x == y
     _ -> false
@@ -202,7 +205,14 @@ newtype Timeline index = Timeline
 derive instance genericTimeline :: Generic (Timeline index) _
 derive newtype instance eqTimeline :: Ord index => Eq (Timeline index)
 derive newtype instance ordTimeline :: Ord index => Ord (Timeline index)
-derive newtype instance showTimeline :: Show index => Show (Timeline index)
+instance showTimeline :: Show index => Show (Timeline index) where
+  show = genericShow
+  -- show (Timeline x) =
+  --   "Timeline {children: " <> show x.children
+  --   <> ", name: " <> show x.name
+  --   <> ", description: " <> show x.description
+  --   <> ", document: " <> show x.document
+  --   <> "}"
 derive newtype instance encodeJsonTimeline :: EncodeJson index => EncodeJson (Timeline index)
 derive newtype instance decodeJsonTimeline :: (DecodeJson index, Ord index) => DecodeJson (Timeline index)
 instance encodeArrayBufferTimeline :: EncodeArrayBuffer index => EncodeArrayBuffer (Timeline index) where
@@ -219,7 +229,11 @@ instance dynamicByteLengthTimeline :: DynamicByteLength index => DynamicByteLeng
     byteLength (tuple4 children name description document)
 instance arbitraryTimeline :: (Arbitrary index, Ord index) => Arbitrary (Timeline index) where
   arbitrary = do
-    children <- sized \size -> resize (size `div` 2) arbitrary
+    children <- sized \size -> resize (size `div` 2) do
+      let event = Tuple <$> (Instant <$> arbitrary) <*> (arrayOf (EventChild <$> arbitrary))
+          timeSpan = Tuple <$> (Span <$> arbitrary) <*> (arrayOf (TimeSpanChild <$> arbitrary))
+      (xs :: Array _) <- arrayOf $ oneOf $ NonEmpty event [timeSpan]
+      pure (IxMultiSet.fromFoldable xs)
     name <- genString
     description <- genString
     document <- genString
@@ -246,7 +260,13 @@ newtype TimeSpan = TimeSpan
 derive instance genericTimeSpan :: Generic TimeSpan _
 derive newtype instance eqTimeSpan :: Eq TimeSpan
 derive newtype instance ordTimeSpan :: Ord TimeSpan
-derive newtype instance showTimeSpan :: Show TimeSpan
+instance showTimeSpan :: Show TimeSpan where
+  show (TimeSpan x) =
+    "TimeSpan {timeSpace: " <> show x.timeSpace
+    <> ", name: " <> show x.name
+    <> ", description: " <> show x.description
+    <> ", document: " <> show x.document
+    <> "}"
 derive newtype instance encodeJsonTimeSpan :: EncodeJson TimeSpan
 derive newtype instance decodeJsonTimeSpan :: DecodeJson TimeSpan
 instance encodeArrayBufferTimeSpan :: EncodeArrayBuffer TimeSpan where

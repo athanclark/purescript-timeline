@@ -5,18 +5,15 @@ import Data.Maybe (Maybe (..))
 import Data.Tuple (Tuple (..))
 import Data.Either (Either (..))
 import Data.NonEmpty (NonEmpty (..))
-import Data.UInt (fromInt) as UInt
 import Data.Generic.Rep (class Generic)
 import Data.Argonaut
   ( class EncodeJson, class DecodeJson, (.:), (:=), (~>), jsonEmptyObject, decodeJson)
 import Data.ArrayBuffer.Class
   ( class DynamicByteLength, class EncodeArrayBuffer, class DecodeArrayBuffer
   , putArrayBuffer, readArrayBuffer, byteLength)
-import Data.ArrayBuffer.Class.Types (Uint8 (..))
 import Control.Alternative ((<|>))
-import Effect.Exception (throw)
 import Test.QuickCheck (class Arbitrary, arbitrary)
-import Test.QuickCheck.Gen (oneOf)
+import Test.QuickCheck.Gen (oneOf, suchThat)
 
 
 -- | Represents a period between to specific instances
@@ -65,7 +62,10 @@ instance decodeArrayBufferSpanOfTime :: (DynamicByteLength a, DecodeArrayBuffer 
         case mY of
           Nothing -> pure Nothing
           Just stopTime -> pure (Just (SpanOfTime {startTime,stopTime}))
-derive newtype instance arbitrarySpanOfTime :: Arbitrary a => Arbitrary (SpanOfTime a)
+instance arbitrarySpanOfTime :: (Arbitrary a, Ord a) => Arbitrary (SpanOfTime a) where
+  arbitrary = do
+    Tuple startTime stopTime <- arbitrary `suchThat` (\(Tuple startTime stopTime) -> startTime < stopTime)
+    pure (SpanOfTime {startTime,stopTime})
 
 
 -- | **Note**: Does not check for surrounding `TimeSpace` bounds.
@@ -110,8 +110,10 @@ instance eqInstantOrSpan :: Eq a => Eq (InstantOrSpan a) where
 instance ordInstantOrSpan :: Ord a => Ord (InstantOrSpan a) where
   compare (Instant x) (Instant y) = compare x y
   compare (Span x) (Span y) = compare x y
-  compare (Instant x) (Span (SpanOfTime {stopTime})) = if x <= stopTime then LT else GT
-  compare (Span (SpanOfTime {stopTime})) (Instant y) = if y <= stopTime then LT else GT
+  compare (Instant _) (Span _) = LT
+  compare (Span _) (Instant _) = GT
+  -- compare (Instant x) (Span (SpanOfTime {startTime})) = if x <= startTime then LT else GT
+  -- compare (Span (SpanOfTime {startTime})) (Instant y) = if y <= startTime then LT else GT
 instance showInstantOrSpan :: Show a => Show (InstantOrSpan a) where
   show x = case x of
     Instant y -> "Instant (" <> show y <> ")"
@@ -140,7 +142,7 @@ instance decodeArrayBufferInstantOrSpan :: (DynamicByteLength a, DecodeArrayBuff
           Left y -> Instant y
           Right y -> Span y
     in  map fromEither <$> readArrayBuffer b o
-instance arbitraryInstantOrSpan :: Arbitrary a => Arbitrary (InstantOrSpan a) where
+instance arbitraryInstantOrSpan :: (Arbitrary a, Ord a) => Arbitrary (InstantOrSpan a) where
   arbitrary = oneOf $ NonEmpty (Instant <$> arbitrary) [Span <$> arbitrary]
 
 

@@ -2,26 +2,16 @@ module Timeline.Data.TimeScale where
 
 import Prelude
 import Data.Maybe (Maybe (..))
-import Data.Either (Either (..))
-import Data.Enum (toEnumWithDefaults)
-import Data.String.CodeUnits (fromCharArray)
 import Data.NonEmpty (NonEmpty (..))
-import Data.Tuple.Nested (type (/\), tuple3, uncurry3, tuple4, uncurry4, tuple5, uncurry5, tuple6, uncurry6)
-import Data.MultiSet.Indexed (IxMultiSet)
-import Data.MultiSet.Indexed (mapKeys) as IxMultiSet
+import Data.Tuple.Nested (type (/\), tuple6, uncurry6)
 import Data.Generic.Rep (class Generic)
-import Data.Generic.Rep.Eq (genericEq)
-import Data.Generic.Rep.Ord (genericCompare)
-import Data.Argonaut (class EncodeJson, class DecodeJson, decodeJson, (.:), (:=), (~>), jsonEmptyObject)
+import Data.Generic.Rep.Show (genericShow)
+import Data.Argonaut (class EncodeJson, class DecodeJson)
 import Data.ArrayBuffer.Class
   ( class EncodeArrayBuffer, class DecodeArrayBuffer, class DynamicByteLength
   , putArrayBuffer, readArrayBuffer, byteLength)
-import Data.ArrayBuffer.Class.Types (Int8 (..), Float64BE (..))
-import Control.Alternative ((<|>))
-import Effect (Effect)
-import Effect.Unsafe (unsafePerformEffect)
 import Test.QuickCheck (class Arbitrary, arbitrary)
-import Test.QuickCheck.Gen (Gen, chooseInt, arrayOf, oneOf, sized, resize)
+import Test.QuickCheck.Gen (oneOf)
 import Test.QuickCheck.UTF8String (genString)
 
 
@@ -41,7 +31,8 @@ derive newtype instance eqTimeScale :: Eq index => Eq (TimeScale index)
 derive newtype instance ordTimeScale :: Ord index => Ord (TimeScale index)
 instance functorTimeScale :: Functor TimeScale where
   map f (TimeScale x) = TimeScale x {beginIndex = f x.beginIndex, endIndex = f x.endIndex}
-derive newtype instance showTimeScale :: Show index => Show (TimeScale index)
+instance showTimeScale :: (Show index) => Show (TimeScale index) where
+  show = genericShow
 derive newtype instance encodeJsonTimeScale :: EncodeJson index => EncodeJson (TimeScale index)
 derive newtype instance decodeJsonTimeScale :: DecodeJson index => DecodeJson (TimeScale index)
 instance encodeArrayBufferTimeScale :: EncodeArrayBuffer index => EncodeArrayBuffer (TimeScale index) where
