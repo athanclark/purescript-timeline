@@ -8,7 +8,7 @@ module Timeline.Data
   , module Timeline.Data.TimeScale
   ) where
 
-import Timeline.Data.TimeComponent (SpanOfTime, InstantOrSpan (..))
+import Timeline.Data.TimeComponent (InstantOrSpan (..))
 import Timeline.Data.Event (Event (..))
 import Timeline.Data.TimeScale (TimeScale (..))
 
@@ -52,15 +52,7 @@ newtype TimeSpace index = TimeSpace
 derive instance genericTimeSpace :: Generic (TimeSpace index) _
 derive newtype instance eqTimeSpace :: Ord index => Eq (TimeSpace index)
 derive newtype instance ordTimeSpace :: Ord index => Ord (TimeSpace index)
-instance showTimeSpace :: Show index => Show (TimeSpace index) where
-  show = genericShow
-  -- show (TimeSpace x) =
-  --   "TimeSpace {timeScale: " <> show x.timeScale
-  --   <> ", timelines: " <> show x.timelines
-  --   <> ", title: " <> show x.title
-  --   <> ", description: " <> show x.description
-  --   <> ", document: " <> show x.document
-  --   <> "}"
+derive newtype instance showTimeSpace :: Show index => Show (TimeSpace index)
 derive newtype instance encodeJsonTimeSpace :: EncodeJson index => EncodeJson (TimeSpace index)
 derive newtype instance decodeJsonTimeSpace :: (DecodeJson index, Ord index) => DecodeJson (TimeSpace index)
 instance encodeArrayBufferTimeSpace :: EncodeArrayBuffer index => EncodeArrayBuffer (TimeSpace index) where
