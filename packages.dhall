@@ -142,6 +142,11 @@ let additions =
     , repo = "https://github.com/openchronology/purescript-indexed-set.git"
     , version = "master"
     }
+  , quickcheck-utf8 =
+    { dependencies = ["quickcheck"]
+    , repo = "https://github.com/openchronology/purescript-quickcheck-utf8.git"
+    , version = "master"
+    }
   }
 
 in  upstream // overrides // additions

@@ -15,6 +15,7 @@ You can edit this file as you like.
   , "prelude"
   , "psci-support"
   , "spec"
+  , "quickcheck-utf8"
   ]
 , packages = ./packages.dhall
 , sources = [ "src/**/*.purs", "test/**/*.purs" ]
