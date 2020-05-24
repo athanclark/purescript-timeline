@@ -20,6 +20,7 @@ import Data.Tuple.Nested (type (/\), tuple4, uncurry4, tuple5, uncurry5)
 import Data.NonEmpty (NonEmpty (..))
 import Data.MultiSet.Indexed (IxMultiSet)
 import Data.MultiSet.Indexed (mapKeys, fromFoldable) as IxMultiSet
+import Data.IxSet (IxSet)
 import Data.Generic.Rep (class Generic)
 import Data.Generic.Rep.Ord (genericCompare)
 import Data.Generic.Rep.Show (genericShow)
@@ -41,7 +42,7 @@ import Test.QuickCheck.UTF8String (genString)
 -- | is represented spatially; a time-scale.
 newtype TimeSpace index = TimeSpace
   { timeScale :: TimeScale index
-  , timelines :: Array (Timeline index)
+  , timelines :: IxSet (Timeline index)
   -- FIXME add cross-referenced timeline children? Ones that _reference_ multiple timelines, rather than belong to them
   -- non-essential
   , title       :: String
@@ -52,7 +53,7 @@ newtype TimeSpace index = TimeSpace
 derive instance genericTimeSpace :: Generic (TimeSpace index) _
 derive newtype instance eqTimeSpace :: Ord index => Eq (TimeSpace index)
 derive newtype instance ordTimeSpace :: Ord index => Ord (TimeSpace index)
-derive newtype instance showTimeSpace :: Show index => Show (TimeSpace index)
+derive newtype instance showTimeSpace :: (Show index, Ord index) => Show (TimeSpace index)
 derive newtype instance encodeJsonTimeSpace :: EncodeJson index => EncodeJson (TimeSpace index)
 derive newtype instance decodeJsonTimeSpace :: (DecodeJson index, Ord index) => DecodeJson (TimeSpace index)
 instance encodeArrayBufferTimeSpace :: EncodeArrayBuffer index => EncodeArrayBuffer (TimeSpace index) where

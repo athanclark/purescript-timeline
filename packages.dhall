@@ -124,16 +124,24 @@ let upstream =
 let overrides = {=}
 
 let additions =
-      { indexed-multiset =
-        { dependencies =
-          [ "foreign-object"
-          , "generics-rep"
-          , "ordered-collections"
-          , "parseint"
-          ]
-        , repo = "https://github.com/openchronology/purescript-indexed-multiset.git"
-        , version = "master"
-        }
-      }
+  { indexed-multiset =
+    { dependencies =
+      [ "ordered-collections"
+      , "intmap"
+      ]
+    , repo = "https://github.com/openchronology/purescript-indexed-multiset.git"
+    , version = "master"
+    }
+  , intmap =
+    { dependencies = ["arraybuffer-class", "argonaut", "parseint"]
+    , repo = "https://github.com/openchronology/purescript-intmap.git"
+    , version = "master"
+    }
+  , indexed-set =
+    { dependencies = ["intmap"]
+    , repo = "https://github.com/openchronology/purescript-indexed-set.git"
+    , version = "master"
+    }
+  }
 
 in  upstream // overrides // additions

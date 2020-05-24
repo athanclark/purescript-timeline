@@ -10,6 +10,7 @@ You can edit this file as you like.
   , "debug"
   , "effect"
   , "indexed-multiset"
+  , "indexed-set"
   , "numbers"
   , "prelude"
   , "psci-support"
