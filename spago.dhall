@@ -6,16 +6,20 @@ You can edit this file as you like.
 , dependencies =
   [ "argonaut"
   , "arraybuffer-class"
-  , "console"
+  , "data-default"
   , "debug"
-  , "effect"
   , "indexed-multiset"
+  , "indexed-demiset"
   , "indexed-set"
+  , "node-fs-aff"
   , "numbers"
-  , "prelude"
   , "psci-support"
-  , "spec"
   , "quickcheck-utf8"
+  , "spec"
+  , "stringutils"
+  , "uuid"
+  , "web-html"
+  , "zeta"
   ]
 , packages = ./packages.dhall
 , sources = [ "src/**/*.purs", "test/**/*.purs" ]

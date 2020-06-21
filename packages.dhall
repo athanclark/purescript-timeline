@@ -119,32 +119,50 @@ let additions =
 
 
 let upstream =
-      https://github.com/purescript/package-sets/releases/download/psc-0.13.6-20200507/packages.dhall sha256:9c1e8951e721b79de1de551f31ecb5a339e82bbd43300eb5ccfb1bf8cf7bbd62
+      https://github.com/purescript/package-sets/releases/download/psc-0.13.8-20200615/packages.dhall sha256:5d0cfad9408c84db0a3fdcea2d708f9ed8f64297e164dc57a7cf6328706df93a
 
-let overrides = {=}
+let overrides =
+  { uuid =
+    { dependencies = ["foreign-generic", "sized-vectors"]
+    , repo = "https://github.com/openchronology/purescript-uuid.git"
+    , version = "master"
+    }
+  , arraybuffer-class = upstream.arraybuffer-class //
+    { version = "v0.2.6"
+    }
+  }
 
 let additions =
   { indexed-multiset =
-    { dependencies =
-      [ "ordered-collections"
-      , "intmap"
-      ]
-    , repo = "https://github.com/openchronology/purescript-indexed-multiset.git"
+    { dependencies = [ "ordered-collections", "intmap" ]
+    , repo =
+        "https://github.com/openchronology/purescript-indexed-multiset.git"
     , version = "master"
     }
   , intmap =
-    { dependencies = ["arraybuffer-class", "argonaut", "parseint"]
+    { dependencies = [ "arraybuffer-class", "argonaut", "parseint" ]
     , repo = "https://github.com/openchronology/purescript-intmap.git"
     , version = "master"
     }
   , indexed-set =
-    { dependencies = ["intmap"]
+    { dependencies = [ "intmap" ]
     , repo = "https://github.com/openchronology/purescript-indexed-set.git"
     , version = "master"
     }
   , quickcheck-utf8 =
-    { dependencies = ["quickcheck"]
-    , repo = "https://github.com/openchronology/purescript-quickcheck-utf8.git"
+    { dependencies = [ "quickcheck" ]
+    , repo =
+        "https://github.com/openchronology/purescript-quickcheck-utf8.git"
+    , version = "master"
+    }
+  , file-store =
+    { dependencies = [ "aff", "arraybuffer", "b64", "promises", "web-html" ]
+    , repo = "https://github.com/openchronology/purescript-file-store.git"
+    , version = "master"
+    }
+  , indexed-demiset =
+    { dependencies = ["intmap"]
+    , repo = "https://github.com/openchronology/purescript-indexed-demiset.git"
     , version = "master"
     }
   }

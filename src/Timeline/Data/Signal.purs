@@ -1,8 +1,5 @@
 module Timeline.Data.Signal where
 
-
-
-
 -- type TimeSpan rw index =
 --   { startIndex  :: Signal rw index
 --   , stopIndex   :: Signal rw index
