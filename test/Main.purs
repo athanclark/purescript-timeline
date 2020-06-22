@@ -1,6 +1,18 @@
 module Test.Main where
 
-import Timeline.Data (TimeSpan, Event, TimelineChild, Timeline, TimeScale, TimeSpace, TimeSpaceDecided)
+import Timeline.Data (TimeSpan, TimelineChild, Timeline, TimeSpace, TimeSpaceDecided) as Data
+import Timeline.Data.Event (Event) as Data
+import Timeline.Data.TimeScale (TimeScale) as Data
+import Timeline.UI.Event (Event) as UI
+import Timeline.UI.TimeSpan (TimeSpan) as UI
+import Timeline.UI.EventOrTimeSpan (EventOrTimeSpan) as UI
+import Timeline.UI.Settings (Settings) as UI
+import Timeline.UI.TimeSpaceName (TimeSpaceName) as UI
+import Timeline.UI.TimeScale (TimeScale) as UI
+import Timeline.UI.Timeline (Timeline) as UI
+import Timeline.UI.Timelines (Timelines) as UI
+import Timeline.UI.Children (Children) as UI
+import Timeline.UI.Siblings (Siblings) as UI
 
 import Prelude
 import Data.Maybe (Maybe (..))
@@ -31,21 +43,33 @@ tests :: SpecT Aff Unit Identity Unit
 tests = do
   describe "Timeline.Data" do
     describe "Json" do
-      jsonTest "TimeSpan" (Proxy :: Proxy (TimeSpan Number))
-      jsonTest "Event" (Proxy :: Proxy (Event Number))
-      jsonTest "TimelineChild" (Proxy :: Proxy (TimelineChild Number))
-      jsonTest "Timeline" (Proxy :: Proxy (Timeline Number))
-      jsonTest "TimeScale" (Proxy :: Proxy (TimeScale Number))
-      jsonTest "TimeSpace" (Proxy :: Proxy (TimeSpace Number))
-      jsonTest "TimeSpaceDecided" (Proxy :: Proxy TimeSpaceDecided)
+      jsonTest "TimeSpan" (Proxy :: Proxy (Data.TimeSpan Number))
+      jsonTest "Event" (Proxy :: Proxy (Data.Event Number))
+      jsonTest "TimelineChild" (Proxy :: Proxy (Data.TimelineChild Number))
+      jsonTest "Timeline" (Proxy :: Proxy (Data.Timeline Number))
+      jsonTest "TimeScale" (Proxy :: Proxy (Data.TimeScale Number))
+      jsonTest "TimeSpace" (Proxy :: Proxy (Data.TimeSpace Number))
+      jsonTest "TimeSpaceDecided" (Proxy :: Proxy Data.TimeSpaceDecided)
     describe "Binary" do
-      binaryTest "TimeSpan" (Proxy :: Proxy (TimeSpan BinaryFloat))
-      binaryTest "Event" (Proxy :: Proxy (Event BinaryFloat))
-      binaryTest "TimelineChild" (Proxy :: Proxy (TimelineChild BinaryFloat))
-      binaryTest "Timeline" (Proxy :: Proxy (Timeline BinaryFloat))
-      binaryTest "TimeScale" (Proxy :: Proxy (TimeScale BinaryFloat))
-      binaryTest "TimeSpace" (Proxy :: Proxy (TimeSpace BinaryFloat))
-      binaryTest "TimeSpaceDecided" (Proxy :: Proxy TimeSpaceDecided)
+      binaryTest "TimeSpan" (Proxy :: Proxy (Data.TimeSpan BinaryFloat))
+      binaryTest "Event" (Proxy :: Proxy (Data.Event BinaryFloat))
+      binaryTest "TimelineChild" (Proxy :: Proxy (Data.TimelineChild BinaryFloat))
+      binaryTest "Timeline" (Proxy :: Proxy (Data.Timeline BinaryFloat))
+      binaryTest "TimeScale" (Proxy :: Proxy (Data.TimeScale BinaryFloat))
+      binaryTest "TimeSpace" (Proxy :: Proxy (Data.TimeSpace BinaryFloat))
+      binaryTest "TimeSpaceDecided" (Proxy :: Proxy Data.TimeSpaceDecided)
+  describe "Timeline.UI" $
+    describe "Json" do
+      jsonTest "Event" (Proxy :: Proxy UI.Event)
+      jsonTest "TimeSpan" (Proxy :: Proxy UI.TimeSpan)
+      jsonTest "EventOrTimeSpan" (Proxy :: Proxy UI.EventOrTimeSpan)
+      jsonTest "Settings" (Proxy :: Proxy UI.Settings)
+      jsonTest "TimeSpaceName" (Proxy :: Proxy UI.TimeSpaceName)
+      jsonTest "TimeScale" (Proxy :: Proxy UI.TimeScale)
+      jsonTest "Timeline" (Proxy :: Proxy UI.Timeline)
+      jsonTest "Timelines" (Proxy :: Proxy UI.Timelines)
+      jsonTest "Children" (Proxy :: Proxy UI.Children)
+      jsonTest "Siblings" (Proxy :: Proxy UI.Siblings)
   where
     jsonTest :: forall a
               . Arbitrary a
