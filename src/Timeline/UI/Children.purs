@@ -1,7 +1,7 @@
 module Timeline.UI.Children where
 
-import Timeline.UI.Index.Value (DecidedValue(..))
-import Timeline.UI.Index.Span (DecidedSpan(..))
+import Timeline.Time.Value (DecidedValue(..))
+import Timeline.Time.Span (DecidedSpan(..))
 import Timeline.UI.Event (Event(..))
 import Timeline.UI.TimeSpan (TimeSpan(..))
 import Timeline.UI.EventOrTimeSpan (EventOrTimeSpan(..))

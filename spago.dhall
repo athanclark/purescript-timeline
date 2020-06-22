@@ -4,12 +4,10 @@ You can edit this file as you like.
 -}
 { name = "timeline"
 , dependencies =
-  [ "argonaut"
-  , "arraybuffer-class"
-  , "data-default"
+  [ "data-default"
   , "debug"
-  , "indexed-multiset"
   , "indexed-demiset"
+  , "indexed-multiset"
   , "indexed-set"
   , "node-fs-aff"
   , "numbers"
@@ -17,6 +15,7 @@ You can edit this file as you like.
   , "quickcheck-utf8"
   , "spec"
   , "stringutils"
+  , "timeline-time"
   , "uuid"
   , "web-html"
   , "zeta"

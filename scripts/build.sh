@@ -3,7 +3,7 @@
 
 # ----------- compiling
 
-spago build
+spago build \
      || { echo "Build Failed"; exit 1; }
 
 echo "Built"

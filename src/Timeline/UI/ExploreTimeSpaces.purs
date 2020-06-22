@@ -1,6 +1,6 @@
 module Timeline.UI.ExploreTimeSpaces where
 
-import Timeline.Data.TimeComponent (SpanOfTime(..))
+import Timeline.Time.Bounds (DecidedBounds(..))
 import Prelude
 import Data.Maybe (Maybe(..))
 import Data.Tuple (Tuple(..))
@@ -13,23 +13,23 @@ import IxZeta (IxSignal, make) as IxSig
 import Partial.Unsafe (unsafePartial)
 
 -- | Used to assist the recursive type, due to children being a mapping
-newtype WithSpanOfTime a
-  = WithSpanOfTime
-  { spanOfTime :: SpanOfTime String
+newtype WithBounds a
+  = WithBounds
+  { bounds :: DecidedBounds
   , timeSpaces :: a
   }
 
-instance functorWithSpanOfTime :: Functor WithSpanOfTime where
-  map f (WithSpanOfTime x) = WithSpanOfTime x { timeSpaces = f x.timeSpaces }
+instance functorWithBounds :: Functor WithBounds where
+  map f (WithBounds x) = WithBounds x { timeSpaces = f x.timeSpaces }
 
-instance applyWithSpanOfTime :: Apply WithSpanOfTime where
-  apply (WithSpanOfTime f) (WithSpanOfTime x) = WithSpanOfTime x { timeSpaces = f.timeSpaces x.timeSpaces }
+instance applyWithBounds :: Apply WithBounds where
+  apply (WithBounds f) (WithBounds x) = WithBounds x { timeSpaces = f.timeSpaces x.timeSpaces }
 
 -- | Should be treated like a global state - is what's communicated to the dialog via signal
 newtype ExploreTimeSpaces
   = ExploreTimeSpaces
   { name :: String
-  , children :: IxDemiSet (SpanOfTime String) ExploreTimeSpaces
+  , children :: IxDemiSet DecidedBounds ExploreTimeSpaces
   }
 
 -- | Should be treated as only used by the dialog in it's component state
@@ -39,18 +39,18 @@ newtype ExploreTimeSpacesWithAux
   , children ::
       Maybe
         { open :: Boolean
-        , children :: IxDemiSet (SpanOfTime String) ExploreTimeSpacesWithAux
+        , children :: IxDemiSet DecidedBounds ExploreTimeSpacesWithAux
         }
   }
 
-newExploreTimeSpacesSignal :: Effect (IxSig.IxSignal ( read :: S.READ, write :: S.WRITE ) (WithSpanOfTime ExploreTimeSpaces))
+newExploreTimeSpacesSignal :: Effect (IxSig.IxSignal ( read :: S.READ, write :: S.WRITE ) (WithBounds ExploreTimeSpaces))
 newExploreTimeSpacesSignal =
   IxSig.make
-    $ WithSpanOfTime
-        { spanOfTime:
-            SpanOfTime
-              { startTime: "1234"
-              , stopTime: "5678"
+    $ WithBounds
+        { bounds:
+            DecidedBoundsNumber
+              { begin: 1234.0
+              , end: 5678.0
               }
         , timeSpaces:
             ExploreTimeSpaces
@@ -59,27 +59,27 @@ newExploreTimeSpacesSignal =
                   let
                     { set } =
                       IxDemiSet.fromFoldable
-                        [ Tuple (SpanOfTime { startTime: "a", stopTime: "b" })
+                        [ Tuple (DecidedBoundsNumber { begin: 0.0, end: 1.0 })
                             $ ExploreTimeSpaces
                                 { name: "TimeSpace Child 1", children: IxDemiSet.empty }
-                        , Tuple (SpanOfTime { startTime: "c", stopTime: "d" })
+                        , Tuple (DecidedBoundsNumber { begin: 1.0, end: 2.0 })
                             $ ExploreTimeSpaces
                                 { name: "TimeSpace Child 2"
                                 , children:
                                     let
                                       { set } =
                                         IxDemiSet.fromFoldable
-                                          [ Tuple (SpanOfTime { startTime: "g", stopTime: "h" })
+                                          [ Tuple (DecidedBoundsNumber { begin: 2.0, end: 3.0 })
                                               $ ExploreTimeSpaces
                                                   { name: "TimeSpace GrandChild 1", children: IxDemiSet.empty }
-                                          , Tuple (SpanOfTime { startTime: "i", stopTime: "j" })
+                                          , Tuple (DecidedBoundsNumber { begin: 4.0, end: 5.0 })
                                               $ ExploreTimeSpaces
                                                   { name: "TimeSpace GrandChild 2", children: IxDemiSet.empty }
                                           ]
                                     in
                                       set
                                 }
-                        , Tuple (SpanOfTime { startTime: "e", stopTime: "f" })
+                        , Tuple (DecidedBoundsNumber { begin: 6.0, end: 7.0 })
                             $ ExploreTimeSpaces
                                 { name: "TimeSpace Child 3", children: IxDemiSet.empty }
                         ]

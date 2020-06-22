@@ -165,6 +165,11 @@ let additions =
     , repo = "https://github.com/openchronology/purescript-indexed-demiset.git"
     , version = "master"
     }
+  , timeline-time =
+    { dependencies = ["arraybuffer-class", "argonaut"]
+    , repo = "https://github.com/openchronology/purescript-timeline-time.git"
+    , version = "master"
+    }
   }
 
 in  upstream // overrides // additions

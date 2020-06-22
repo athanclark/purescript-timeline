@@ -1,6 +1,6 @@
 module Timeline.UI.Event where
 
-import Timeline.UI.Index.Value (DecidedValue)
+import Timeline.Time.Value (DecidedValue)
 import Prelude
 import Data.Generic.Rep (class Generic)
 import Data.Argonaut

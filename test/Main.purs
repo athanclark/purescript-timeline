@@ -1,7 +1,6 @@
 module Test.Main where
 
 import Timeline.Data (TimeSpan, Event, TimelineChild, Timeline, TimeScale, TimeSpace, TimeSpaceDecided)
-import Timeline.Data.TimeComponent (SpanOfTime, InstantOrSpan)
 
 import Prelude
 import Data.Maybe (Maybe (..))
@@ -16,6 +15,7 @@ import Data.Identity (Identity)
 import Effect (Effect)
 import Effect.Aff (Aff, launchAff_)
 import Effect.Class (liftEffect)
+import Effect.Console (log)
 import Effect.Unsafe (unsafePerformEffect)
 import Test.QuickCheck (class Arbitrary, arbitrary, quickCheck, Result (..))
 import Test.Spec (describe, it, SpecT)
@@ -29,26 +29,23 @@ main = launchAff_ $ runSpec' (defaultConfig {timeout = Nothing}) [consoleReporte
 
 tests :: SpecT Aff Unit Identity Unit
 tests = do
-  describe "Json" do
-    jsonTest "SpanOfTime" (Proxy :: Proxy (SpanOfTime Number))
-    jsonTest "InstantOrSpan" (Proxy :: Proxy (InstantOrSpan Number))
-    jsonTest "TimeSpan" (Proxy :: Proxy TimeSpan)
-    jsonTest "Event" (Proxy :: Proxy Event)
-    jsonTest "TimelineChild" (Proxy :: Proxy TimelineChild)
-    jsonTest "Timeline" (Proxy :: Proxy (Timeline Number))
-    jsonTest "TimeScale" (Proxy :: Proxy (TimeScale Number))
-    jsonTest "TimeSpace" (Proxy :: Proxy (TimeSpace Number))
-    jsonTest "TimeSpaceDecided" (Proxy :: Proxy TimeSpaceDecided)
-  describe "Binary" do
-    binaryTest "SpanOfTime" (Proxy :: Proxy (SpanOfTime BinaryFloat))
-    binaryTest "InstantOrSpan" (Proxy :: Proxy (InstantOrSpan BinaryFloat))
-    binaryTest "TimeSpan" (Proxy :: Proxy TimeSpan)
-    binaryTest "Event" (Proxy :: Proxy Event)
-    binaryTest "TimelineChild" (Proxy :: Proxy TimelineChild)
-    binaryTest "Timeline" (Proxy :: Proxy (Timeline BinaryFloat))
-    binaryTest "TimeScale" (Proxy :: Proxy (TimeScale BinaryFloat))
-    binaryTest "TimeSpace" (Proxy :: Proxy (TimeSpace BinaryFloat))
-    binaryTest "TimeSpaceDecided" (Proxy :: Proxy TimeSpaceDecided)
+  describe "Timeline.Data" do
+    describe "Json" do
+      jsonTest "TimeSpan" (Proxy :: Proxy (TimeSpan Number))
+      jsonTest "Event" (Proxy :: Proxy (Event Number))
+      jsonTest "TimelineChild" (Proxy :: Proxy (TimelineChild Number))
+      jsonTest "Timeline" (Proxy :: Proxy (Timeline Number))
+      jsonTest "TimeScale" (Proxy :: Proxy (TimeScale Number))
+      jsonTest "TimeSpace" (Proxy :: Proxy (TimeSpace Number))
+      jsonTest "TimeSpaceDecided" (Proxy :: Proxy TimeSpaceDecided)
+    describe "Binary" do
+      binaryTest "TimeSpan" (Proxy :: Proxy (TimeSpan BinaryFloat))
+      binaryTest "Event" (Proxy :: Proxy (Event BinaryFloat))
+      binaryTest "TimelineChild" (Proxy :: Proxy (TimelineChild BinaryFloat))
+      binaryTest "Timeline" (Proxy :: Proxy (Timeline BinaryFloat))
+      binaryTest "TimeScale" (Proxy :: Proxy (TimeScale BinaryFloat))
+      binaryTest "TimeSpace" (Proxy :: Proxy (TimeSpace BinaryFloat))
+      binaryTest "TimeSpaceDecided" (Proxy :: Proxy TimeSpaceDecided)
   where
     jsonTest :: forall a
               . Arbitrary a
