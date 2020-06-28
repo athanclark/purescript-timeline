@@ -1,8 +1,15 @@
 module Timeline.UI.TimeSpace where
 
-newtype TimeSpace a
+import Timeline.UI.TimeScale (TimeScale)
+import Data.UUID (UUID)
+
+newtype TimeSpace
   = TimeSpace
   { title :: String
   , description :: String
-  -- TODO document :: String
+  , timeScale :: TimeScale
+  , eventSiblings :: Array UUID -- TODO manual field sorting
+  , timeSpanSiblings :: Array UUID
+  , timelines :: Array UUID
+  , id :: UUID -- TODO trim the fat later
   }

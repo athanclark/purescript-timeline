@@ -37,14 +37,21 @@ derive newtype instance arbitraryTimelines :: Arbitrary Timelines
 -- FIXME dummy data
 instance defaultTimelines :: Default Timelines where
   def =
-    Timelines
-      [ Timeline { name: "Timeline A", description: "" }
-      , Timeline { name: "Timeline B", description: "" }
-      , Timeline { name: "Timeline C", description: "" }
-      , Timeline { name: "Timeline D", description: "" }
-      , Timeline { name: "Timeline E", description: "" }
-      , Timeline { name: "Timeline F", description: "" }
-      ]
+    let
+      rename s =
+        let
+          Timeline x = def
+        in
+          Timeline x { name = s }
+    in
+      Timelines
+        [ rename "Timeline A"
+        , rename "Timeline B"
+        , rename "Timeline C"
+        , rename "Timeline D"
+        , rename "Timeline E"
+        , rename "Timeline F"
+        ]
 
 localstorageSignalKey :: String
 localstorageSignalKey = "localstorage"

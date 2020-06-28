@@ -27,23 +27,19 @@ import Data.Tuple.Nested
   ( type (/\)
   , tuple4
   , uncurry4
-  , tuple5
-  , uncurry5
   , tuple6
   , uncurry6
   , get1
   , get2
   , get3
   , get4
-  , get5
   )
+import Data.Vec (Vec)
+import Data.Typelevel.Num (D16)
 import Data.UUID (UUID)
 import Data.UUID (toString, parseUUID, genUUID, toBytes, parseBytesUUID) as UUID
 import Data.UInt (fromInt, toInt) as UInt
 import Data.NonEmpty (NonEmpty(..))
-import Data.MultiSet.Indexed (IxMultiSet)
-import Data.MultiSet.Indexed (mapKeys, fromFoldable) as IxMultiSet
-import Data.IxSet (IxSet)
 import Data.Generic.Rep (class Generic)
 import Data.Generic.Rep.Ord (genericCompare)
 import Data.Argonaut (class EncodeJson, class DecodeJson, decodeJson, (.:), (:=), (~>), jsonEmptyObject, fail)
@@ -61,7 +57,7 @@ import Effect (Effect)
 import Effect.Unsafe (unsafePerformEffect)
 import Effect.Exception (throw)
 import Test.QuickCheck (class Arbitrary, arbitrary)
-import Test.QuickCheck.Gen (arrayOf, oneOf, sized, resize)
+import Test.QuickCheck.Gen (oneOf, sized, resize)
 import Test.QuickCheck.UTF8String (genString)
 import Type.Proxy (Proxy(..))
 
@@ -72,11 +68,11 @@ newtype TimeSpace index
   = TimeSpace
   { timeScale :: TimeScale index
   , timelines :: Array (Timeline index)
+  , siblings :: Array (TimelineChild index)
   -- FIXME add cross-referenced timeline children? Ones that _reference_ multiple timelines, rather than belong to them
   -- non-essential
   , title :: String
   , description :: String
-  , document :: String -- TODO markdown
   , id :: UUID
   -- TODO markers, metrics & graduation
   }
@@ -88,6 +84,7 @@ instance functorTimeSpace :: Functor TimeSpace where
     TimeSpace
       x
         { timelines = map (map f) x.timelines
+        , siblings = map (map f) x.siblings
         , timeScale = map f x.timeScale
         }
 
@@ -98,16 +95,16 @@ derive newtype instance ordTimeSpace :: Ord index => Ord (TimeSpace index)
 derive newtype instance showTimeSpace :: Show index => Show (TimeSpace index)
 
 instance encodeJsonTimeSpace :: EncodeJson index => EncodeJson (TimeSpace index) where
-  encodeJson (TimeSpace { timeScale, timelines, title, description, document, id }) =
+  encodeJson (TimeSpace { timeScale, timelines, siblings, title, description, id }) =
     "timeScale" := timeScale
       ~> "timelines"
       := timelines
+      ~> "siblings"
+      := siblings
       ~> "title"
       := title
       ~> "description"
       := description
-      ~> "document"
-      := document
       ~> "id"
       := UUID.toString id
       ~> jsonEmptyObject
@@ -117,51 +114,45 @@ instance decodeJsonTimeSpace :: (DecodeJson index, Ord index) => DecodeJson (Tim
     o <- decodeJson json
     timeScale <- o .: "timeScale"
     timelines <- o .: "timelines"
+    siblings <- o .: "siblings"
     title <- o .: "title"
     description <- o .: "description"
-    document <- o .: "document"
     id' <- o .: "id"
     case UUID.parseUUID id' of
       Nothing -> fail $ "Can't parse UUID: " <> id'
       Just id ->
         pure
           $ TimeSpace
-              { timeScale, timelines, title, description, document, id }
+              { timeScale, timelines, siblings, title, description, id }
 
 instance encodeArrayBufferTimeSpace :: EncodeArrayBuffer index => EncodeArrayBuffer (TimeSpace index) where
-  putArrayBuffer b o (TimeSpace { timeScale, timelines, title, description, document, id }) = putArrayBuffer b o (tuple6 timeScale timelines title description document fixedBytesId)
-    where
-    fixedBytesId = map (Uint8 <<< UInt.fromInt) (UUID.toBytes id)
+  putArrayBuffer b o (TimeSpace { timeScale, timelines, siblings, title, description, id }) = putArrayBuffer b o (tuple6 timeScale timelines siblings title description (toBytesUUID id))
 
 instance decodeArrayBufferTimeSpace :: (DecodeArrayBuffer index, DynamicByteLength index, Ord index) => DecodeArrayBuffer (TimeSpace index) where
   readArrayBuffer b o = do
     let
       go :: _ /\ _ /\ _ /\ _ /\ _ /\ _ /\ Unit -> Effect (Maybe (TimeSpace index))
       go =
-        uncurry6 \timeScale timelines title description document id' -> case UUID.parseBytesUUID (getBytes id') of
+        uncurry6 \timeScale timelines siblings title description id' -> case parseBytesUUID id' of
           Nothing -> throw $ "Can't parse UUID: " <> show id'
-          Just id -> pure $ Just $ TimeSpace { timeScale, timelines, title, description, document, id }
+          Just id -> pure $ Just $ TimeSpace { timeScale, timelines, siblings, title, description, id }
     mXs <- readArrayBuffer b o
     case mXs of
       Nothing -> pure Nothing
       Just xs -> go xs
-    where
-    getBytes = map (\(Uint8 x) -> UInt.toInt x)
 
 instance dynamicByteLengthTimeSpace :: DynamicByteLength index => DynamicByteLength (TimeSpace index) where
-  byteLength (TimeSpace { timeScale, timelines, title, description, document, id }) = byteLength (tuple6 timeScale timelines title description document fixedBytesId)
-    where
-    fixedBytesId = map (Uint8 <<< UInt.fromInt) (UUID.toBytes id)
+  byteLength (TimeSpace { timeScale, timelines, siblings, title, description, id }) = byteLength (tuple6 timeScale timelines siblings title description (toBytesUUID id))
 
 instance arbitraryTimeSpace :: (Arbitrary index, Ord index) => Arbitrary (TimeSpace index) where
   arbitrary = do
     timeScale <- arbitrary
     timelines <- sized \s -> resize (s `div` 4) arbitrary
+    siblings <- sized \s -> resize (s `div` 4) arbitrary
     title <- genString
     description <- genString
-    document <- genString
     id <- pure (unsafePerformEffect UUID.genUUID)
-    pure (TimeSpace { timeScale, timelines, title, description, document, id })
+    pure (TimeSpace { timeScale, timelines, siblings, title, description, id })
 
 -- | All possible Human Time Indicies, with their instances assumed existing
 data TimeSpaceDecided
@@ -310,8 +301,8 @@ newtype Timeline index
   -- non-essential
   , name :: String
   , description :: String
-  , document :: String -- TODO markdown
   -- TODO color
+  , id :: UUID
   }
 
 derive instance genericTimeline :: Generic (Timeline index) _
@@ -324,50 +315,67 @@ derive newtype instance eqTimeline :: Ord index => Eq (Timeline index)
 derive newtype instance ordTimeline :: Ord index => Ord (Timeline index)
 
 instance showTimeline :: Show index => Show (Timeline index) where
-  show (Timeline { children, name, description, document }) =
+  show (Timeline { children, name, description, id }) =
     "(Timeline {children: " <> show children
       <> ", name: "
       <> show name
       <> ", description: "
       <> show description
-      <> ", document: "
-      <> show document
+      <> ", id: "
+      <> show id
       <> "})"
 
-derive newtype instance encodeJsonTimeline :: EncodeJson index => EncodeJson (Timeline index)
+instance encodeJsonTimeline :: EncodeJson index => EncodeJson (Timeline index) where
+  encodeJson (Timeline { children, name, description, id }) =
+    "children" := children
+      ~> "name"
+      := name
+      ~> "description"
+      := description
+      ~> "id"
+      := UUID.toString id
+      ~> jsonEmptyObject
 
-derive newtype instance decodeJsonTimeline :: (DecodeJson index, Ord index) => DecodeJson (Timeline index)
+instance decodeJsonTimeline :: (DecodeJson index, Ord index) => DecodeJson (Timeline index) where
+  decodeJson json = do
+    o <- decodeJson json
+    children <- o .: "children"
+    name <- o .: "name"
+    description <- o .: "description"
+    id' <- o .: "id"
+    case UUID.parseUUID id' of
+      Nothing -> fail $ "Couldn't parse UUID: " <> id'
+      Just id -> pure (Timeline { children, name, description, id })
 
 instance encodeArrayBufferTimeline :: EncodeArrayBuffer index => EncodeArrayBuffer (Timeline index) where
-  putArrayBuffer b o (Timeline { children, name, description, document }) = putArrayBuffer b o (tuple4 children name description document)
+  putArrayBuffer b o (Timeline { children, name, description, id }) = putArrayBuffer b o (tuple4 children name description (toBytesUUID id))
 
 instance decodeArrayBufferTimeline :: (DecodeArrayBuffer index, DynamicByteLength index, Ord index) => DecodeArrayBuffer (Timeline index) where
-  readArrayBuffer b o =
+  readArrayBuffer b o = do
     let
-      go :: _ /\ _ /\ _ /\ _ /\ Unit -> Timeline index
+      go :: _ /\ _ /\ _ /\ _ /\ Unit -> Effect (Maybe (Timeline index))
       go =
-        uncurry4 \children name description document ->
-          Timeline { children, name, description, document }
-    in
-      map go <$> readArrayBuffer b o
+        uncurry4 \children name description id' -> case parseBytesUUID id' of
+          Nothing -> throw $ "Couldn't parse UUID: " <> show id'
+          Just id -> pure $ Just $ Timeline { children, name, description, id }
+    mXs <- readArrayBuffer b o
+    case mXs of
+      Nothing -> pure Nothing
+      Just xs -> go xs
 
 instance dynamicByteLengthTimeline :: DynamicByteLength index => DynamicByteLength (Timeline index) where
-  byteLength (Timeline { children, name, description, document }) = byteLength (tuple4 children name description document)
+  byteLength (Timeline { children, name, description, id }) = byteLength (tuple4 children name description (toBytesUUID id))
 
 instance arbitraryTimeline :: (Arbitrary index, Ord index) => Arbitrary (Timeline index) where
   arbitrary = do
     children <-
       sized \size ->
         resize (size `div` 2) arbitrary
-    -- let
-    --   event = Tuple <$> (Instant <$> arbitrary) <*> (arrayOf (EventChild <$> arbitrary))
-    --   timeSpan = Tuple <$> (Span <$> arbitrary) <*> (arrayOf (TimeSpanChild <$> arbitrary))
-    -- (xs :: Array _) <- arrayOf $ oneOf $ NonEmpty event [ timeSpan ]
-    -- pure (IxMultiSet.fromFoldable xs)
     name <- genString
     description <- genString
-    document <- genString
-    pure (Timeline { children, name, description, document })
+    let
+      id = unsafePerformEffect UUID.genUUID
+    pure (Timeline { children, name, description, id })
 
 -- ------------------ TimeSpan
 -- | An event that lasts over some period of time, optionally containing its own time space (to be seen as a magnification of that period)
@@ -377,7 +385,6 @@ newtype TimeSpan index
   -- non-essential
   , name :: String
   , description :: String
-  , document :: String -- TODO markdown
   -- TODO color
   , id :: UUID
   , span :: Span index
@@ -399,8 +406,6 @@ instance showTimeSpan :: Show index => Show (TimeSpan index) where
       <> show x.name
       <> ", description: "
       <> show x.description
-      <> ", document: "
-      <> show x.document
       <> ", id: "
       <> show x.id
       <> ", span: "
@@ -408,14 +413,12 @@ instance showTimeSpan :: Show index => Show (TimeSpan index) where
       <> "}"
 
 instance encodeJsonTimeSpan :: EncodeJson index => EncodeJson (TimeSpan index) where
-  encodeJson (TimeSpan { timeSpace, name, description, document, id, span }) =
+  encodeJson (TimeSpan { timeSpace, name, description, id, span }) =
     "timeSpace" := timeSpace
       ~> "name"
       := name
       ~> "description"
       := description
-      ~> "document"
-      := document
       ~> "id"
       := UUID.toString id
       ~> "span"
@@ -428,16 +431,15 @@ instance decodeJsonTimeSpan :: DecodeJson index => DecodeJson (TimeSpan index) w
     timeSpace <- o .: "timeSpace"
     name <- o .: "name"
     description <- o .: "description"
-    document <- o .: "document"
     id' <- o .: "id"
     span <- o .: "span" >>= decodeJsonSpan (Proxy :: Proxy index)
     case UUID.parseUUID id' of
       Nothing -> fail $ "Couldn't parse UUID: " <> id'
-      Just id -> pure $ TimeSpan { timeSpace, name, description, document, id, span }
+      Just id -> pure $ TimeSpan { timeSpace, name, description, id, span }
 
 instance encodeArrayBufferTimeSpan :: EncodeArrayBuffer index => EncodeArrayBuffer (TimeSpan index) where
-  putArrayBuffer b o (TimeSpan { timeSpace, name, description, document, id, span }) = do
-    mW <- putArrayBuffer b o (tuple5 timeSpace name description document fixedBytesId)
+  putArrayBuffer b o (TimeSpan { timeSpace, name, description, id, span }) = do
+    mW <- putArrayBuffer b o (tuple4 timeSpace name description (toBytesUUID id))
     case mW of
       Nothing -> pure Nothing
       Just w -> do
@@ -445,41 +447,34 @@ instance encodeArrayBufferTimeSpan :: EncodeArrayBuffer index => EncodeArrayBuff
         case mW' of
           Nothing -> pure (Just w)
           Just w' -> pure (Just (w + w'))
-    where
-    fixedBytesId = map (Uint8 <<< UInt.fromInt) (UUID.toBytes id)
 
 instance decodeArrayBufferTimeSpan :: (DecodeArrayBuffer index, DynamicByteLength index) => DecodeArrayBuffer (TimeSpan index) where
   readArrayBuffer b o = do
     mXs <- readArrayBuffer b o
     case mXs of
       Nothing -> pure Nothing
-      Just (xs :: _ /\ _ /\ _ /\ _ /\ _ /\ Unit) -> do
+      Just (xs :: _ /\ _ /\ _ /\ _ /\ Unit) -> do
         l <- byteLength xs
         mSpan <- readArrayBufferSpan (Proxy :: Proxy index) b (o + l)
         case mSpan of
           Nothing -> pure Nothing
-          Just span -> case UUID.parseBytesUUID (getBytes (get5 xs)) of
-            Nothing -> throw $ "Couldn't parse UUID: " <> show (get5 xs)
+          Just span -> case parseBytesUUID (get4 xs) of
+            Nothing -> throw $ "Couldn't parse UUID: " <> show (get4 xs)
             Just id ->
               pure $ Just
                 $ TimeSpan
                     { timeSpace: get1 xs
                     , name: get2 xs
                     , description: get3 xs
-                    , document: get4 xs
                     , id
                     , span
                     }
-    where
-    getBytes = map (\(Uint8 x) -> UInt.toInt x)
 
 instance dynamicByteLengthTimeSpan :: DynamicByteLength index => DynamicByteLength (TimeSpan index) where
-  byteLength (TimeSpan { timeSpace, name, description, document, id, span }) = do
+  byteLength (TimeSpan { timeSpace, name, description, id, span }) = do
     l <- byteLengthSpan (Proxy :: Proxy index) span
-    l' <- byteLength (tuple5 timeSpace name description document fixedBytesId)
+    l' <- byteLength (tuple4 timeSpace name description (toBytesUUID id))
     pure (l + l')
-    where
-    fixedBytesId = map (Uint8 <<< UInt.fromInt) (UUID.toBytes id)
 
 instance arbitraryTimeSpan :: Arbitrary index => Arbitrary (TimeSpan index) where
   arbitrary = do
@@ -490,8 +485,14 @@ instance arbitraryTimeSpan :: Arbitrary index => Arbitrary (TimeSpan index) wher
         oneOf (NonEmpty (pure Nothing) [ Just <$> subtree ])
     name <- genString
     description <- genString
-    document <- genString
     let
       id = unsafePerformEffect UUID.genUUID
     span <- genSpan (Proxy :: Proxy index)
-    pure (TimeSpan { timeSpace, name, description, document, id, span })
+    pure (TimeSpan { timeSpace, name, description, id, span })
+
+-- Utilities
+parseBytesUUID :: Vec D16 Uint8 -> Maybe UUID
+parseBytesUUID = UUID.parseBytesUUID <<< map (\(Uint8 x) -> UInt.toInt x)
+
+toBytesUUID :: UUID -> Vec D16 Uint8
+toBytesUUID = map (Uint8 <<< UInt.fromInt) <<< UUID.toBytes

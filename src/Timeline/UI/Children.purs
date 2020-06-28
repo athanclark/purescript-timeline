@@ -39,12 +39,25 @@ derive newtype instance arbitraryChildren :: Arbitrary Children
 -- FIXME dummy data
 instance defaultChildren :: Default Children where
   def =
-    Children
-      [ EventOrTimeSpan $ Left (Event { name: "Event A", description: "baz", time: DecidedValueNumber 3.0 })
-      , EventOrTimeSpan $ Left (Event { name: "Event B", description: "qux", time: DecidedValueNumber 3.5 })
-      , EventOrTimeSpan $ Right (TimeSpan { name: "TimeSpan C", description: "bar", span: DecidedSpanNumber { start: 2.0, stop: 5.0 }, timeSpace: Nothing })
-      , EventOrTimeSpan $ Right (TimeSpan { name: "TimeSpan D", description: "foo", span: DecidedSpanNumber { start: 1.0, stop: 4.0 }, timeSpace: Nothing })
-      ]
+    let
+      renameEvent s v =
+        let
+          Event x = def
+        in
+          Event x { name = s, time = v }
+
+      renameTimeSpan s v =
+        let
+          TimeSpan x = def
+        in
+          TimeSpan x { name = s, span = v }
+    in
+      Children
+        [ EventOrTimeSpan $ Left (renameEvent "Event A" (DecidedValueNumber 3.0))
+        , EventOrTimeSpan $ Left (renameEvent "Event B" (DecidedValueNumber 3.5))
+        , EventOrTimeSpan $ Right (renameTimeSpan "TimeSpan C" (DecidedSpanNumber { start: 2.0, stop: 5.0 }))
+        , EventOrTimeSpan $ Right (renameTimeSpan "TimeSpan D" (DecidedSpanNumber { start: 1.0, stop: 4.0 }))
+        ]
 
 localstorageSignalKey :: String
 localstorageSignalKey = "localstorage"

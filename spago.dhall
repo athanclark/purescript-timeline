@@ -6,9 +6,7 @@ You can edit this file as you like.
 , dependencies =
   [ "data-default"
   , "debug"
-  , "indexed-demiset"
-  , "indexed-multiset"
-  , "indexed-set"
+  , "indexed-array"
   , "node-fs-aff"
   , "numbers"
   , "psci-support"

@@ -3,7 +3,7 @@ module Timeline.Data.Event where
 import Prelude
 import Data.Maybe (Maybe(..))
 import Data.UInt (fromInt, toInt) as UInt
-import Data.Tuple.Nested (type (/\), tuple5, uncurry5)
+import Data.Tuple.Nested (type (/\), tuple4, uncurry4)
 import Data.Generic.Rep (class Generic)
 import Data.Argonaut (class EncodeJson, class DecodeJson, (:=), (~>), jsonEmptyObject, (.:), decodeJson, fail)
 import Data.ArrayBuffer.Class
@@ -28,7 +28,6 @@ newtype Event index
   = Event
   { name :: String
   , description :: String
-  , document :: String -- TODO markdown
   -- TODO color
   , id :: UUID
   , time :: index
@@ -46,12 +45,10 @@ instance functorEvent :: Functor Event where
   map f (Event x) = Event x { time = f x.time }
 
 instance encodeJsonEvent :: EncodeJson index => EncodeJson (Event index) where
-  encodeJson (Event { name, description, document, id, time }) =
+  encodeJson (Event { name, description, id, time }) =
     "name" := name
       ~> "description"
       := description
-      ~> "document"
-      := document
       ~> "id"
       := UUID.toString id
       ~> "time"
@@ -63,26 +60,25 @@ instance decodeJsonEvent :: DecodeJson index => DecodeJson (Event index) where
     o <- decodeJson json
     name <- o .: "name"
     description <- o .: "description"
-    document <- o .: "document"
     id' <- o .: "id"
     time <- o .: "time"
     case UUID.parseUUID id' of
       Nothing -> fail $ "Couldn't parse UUID: " <> id'
-      Just id -> pure $ Event { name, description, document, id, time }
+      Just id -> pure $ Event { name, description, id, time }
 
 instance encodeArrayBufferEvent :: EncodeArrayBuffer index => EncodeArrayBuffer (Event index) where
-  putArrayBuffer b o (Event { name, description, document, id, time }) = putArrayBuffer b o (tuple5 name description document fixedBytesId time)
+  putArrayBuffer b o (Event { name, description, id, time }) = putArrayBuffer b o (tuple4 name description fixedBytesId time)
     where
     fixedBytesId = map (Uint8 <<< UInt.fromInt) (UUID.toBytes id)
 
 instance decodeArrayBufferEvent :: (DecodeArrayBuffer index, DynamicByteLength index) => DecodeArrayBuffer (Event index) where
   readArrayBuffer b o = do
     let
-      go :: _ /\ _ /\ _ /\ _ /\ _ /\ Unit -> Effect (Maybe (Event index))
+      go :: _ /\ _ /\ _ /\ _ /\ Unit -> Effect (Maybe (Event index))
       go =
-        uncurry5 \name description document id' time -> case UUID.parseBytesUUID (getBytes id') of
+        uncurry4 \name description id' time -> case UUID.parseBytesUUID (getBytes id') of
           Nothing -> throw $ "Couldn't parse UUID: " <> show id'
-          Just id -> pure $ Just $ Event { name, description, document, id, time }
+          Just id -> pure $ Just $ Event { name, description, id, time }
     mXs <- readArrayBuffer b o
     case mXs of
       Nothing -> pure Nothing
@@ -91,7 +87,7 @@ instance decodeArrayBufferEvent :: (DecodeArrayBuffer index, DynamicByteLength i
     getBytes = map (\(Uint8 x) -> UInt.toInt x)
 
 instance dynamicByteLengthEvent :: DynamicByteLength index => DynamicByteLength (Event index) where
-  byteLength (Event { name, description, document, id, time }) = byteLength (tuple5 name description document fixedBytesId time)
+  byteLength (Event { name, description, id, time }) = byteLength (tuple4 name description fixedBytesId time)
     where
     fixedBytesId = map (Uint8 <<< UInt.fromInt) (UUID.toBytes id)
 
@@ -99,8 +95,7 @@ instance arbitraryEvent :: Arbitrary index => Arbitrary (Event index) where
   arbitrary = do
     name <- genString
     description <- genString
-    document <- genString
     let
       id = unsafePerformEffect (UUID.genUUID)
     time <- arbitrary
-    pure (Event { name, description, document, id, time })
+    pure (Event { name, description, id, time })
