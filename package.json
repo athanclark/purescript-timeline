@@ -20,7 +20,7 @@
   },
   "homepage": "https://github.com/openchronology/purescript-timeline#readme",
   "dependencies": {
-    "uuid": "^8.1.0",
+    "uuid": "^8.2.0",
     "uuid-validate": "0.0.3"
   }
 }
