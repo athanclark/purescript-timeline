@@ -3,5 +3,6 @@ node_js:
 language: node_js
 install:
   - npm install -g purescript spago
+  - npm install
 script:
   - npm test
