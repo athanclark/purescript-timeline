@@ -2,6 +2,8 @@ module Timeline.Data.Event where
 
 import Prelude
 import Data.Maybe (Maybe(..))
+import Data.Foldable (class Foldable)
+import Data.Traversable (class Traversable)
 import Data.UInt (fromInt, toInt) as UInt
 import Data.Tuple.Nested (type (/\), tuple4, uncurry4)
 import Data.Generic.Rep (class Generic)
@@ -43,6 +45,15 @@ derive newtype instance showEvent :: Show index => Show (Event index)
 
 instance functorEvent :: Functor Event where
   map f (Event x) = Event x { time = f x.time }
+
+instance foldableEvent :: Foldable Event where
+  foldr f acc (Event x) = f x.time acc
+  foldl f acc (Event x) = f acc x.time
+  foldMap f (Event x) = f x.time
+
+instance traversableEvent :: Traversable Event where
+  traverse f (Event x) = (\y -> Event x { time = y }) <$> f x.time
+  sequence (Event x) = (\y -> Event x { time = y }) <$> x.time
 
 instance encodeJsonEvent :: EncodeJson index => EncodeJson (Event index) where
   encodeJson (Event { name, description, id, time }) =

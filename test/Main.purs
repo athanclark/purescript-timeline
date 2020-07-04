@@ -1,6 +1,6 @@
 module Test.Main where
 
-import Timeline.Data (TimeSpan, TimelineChild, Timeline, TimeSpace, TimeSpaceDecided) as Data
+import Timeline.Data (TimeSpan, EventOrTimeSpan, Timeline, TimeSpace, TimeSpaceDecided) as Data
 import Timeline.Data.Event (Event) as Data
 import Timeline.Data.TimeScale (TimeScale) as Data
 import Timeline.UI.Event (Event) as UI
@@ -11,8 +11,10 @@ import Timeline.UI.TimeSpaceName (TimeSpaceName) as UI
 import Timeline.UI.TimeScale (TimeScale) as UI
 import Timeline.UI.Timeline (Timeline) as UI
 import Timeline.UI.Timelines (Timelines) as UI
+import Timeline.UI.TimeSpace (TimeSpace) as UI
 import Timeline.UI.Children (Children) as UI
 import Timeline.UI.Siblings (Siblings) as UI
+import Timeline.Convert (populate, synthesize) as Convert
 
 import Prelude
 import Data.Maybe (Maybe (..))
@@ -28,7 +30,7 @@ import Effect (Effect)
 import Effect.Aff (Aff, launchAff_)
 import Effect.Class (liftEffect)
 import Effect.Unsafe (unsafePerformEffect)
-import Test.QuickCheck (class Arbitrary, arbitrary, quickCheck, Result (..))
+import Test.QuickCheck (class Arbitrary, arbitrary, quickCheck, quickCheck', Result (..))
 import Test.Spec (describe, it, SpecT)
 import Test.Spec.Runner (runSpec', defaultConfig)
 import Test.Spec.Reporter.Console (consoleReporter)
@@ -44,7 +46,7 @@ tests = do
     describe "Json" do
       jsonTest "TimeSpan" (Proxy :: Proxy (Data.TimeSpan Number))
       jsonTest "Event" (Proxy :: Proxy (Data.Event Number))
-      jsonTest "TimelineChild" (Proxy :: Proxy (Data.TimelineChild Number))
+      jsonTest "EventOrTimeSpan" (Proxy :: Proxy (Data.EventOrTimeSpan Number))
       jsonTest "Timeline" (Proxy :: Proxy (Data.Timeline Number))
       jsonTest "TimeScale" (Proxy :: Proxy (Data.TimeScale Number))
       jsonTest "TimeSpace" (Proxy :: Proxy (Data.TimeSpace Number))
@@ -52,7 +54,7 @@ tests = do
     describe "Binary" do
       binaryTest "TimeSpan" (Proxy :: Proxy (Data.TimeSpan BinaryFloat))
       binaryTest "Event" (Proxy :: Proxy (Data.Event BinaryFloat))
-      binaryTest "TimelineChild" (Proxy :: Proxy (Data.TimelineChild BinaryFloat))
+      binaryTest "EventOrTimeSpan" (Proxy :: Proxy (Data.EventOrTimeSpan BinaryFloat))
       binaryTest "Timeline" (Proxy :: Proxy (Data.Timeline BinaryFloat))
       binaryTest "TimeScale" (Proxy :: Proxy (Data.TimeScale BinaryFloat))
       binaryTest "TimeSpace" (Proxy :: Proxy (Data.TimeSpace BinaryFloat))
@@ -67,8 +69,20 @@ tests = do
       jsonTest "TimeScale" (Proxy :: Proxy UI.TimeScale)
       jsonTest "Timeline" (Proxy :: Proxy UI.Timeline)
       jsonTest "Timelines" (Proxy :: Proxy UI.Timelines)
+      jsonTest "TimeSpace" (Proxy :: Proxy UI.TimeSpace)
       jsonTest "Children" (Proxy :: Proxy UI.Children)
       jsonTest "Siblings" (Proxy :: Proxy UI.Siblings)
+  describe "Timeline.Convert" do
+    let synthesizePopulateIso :: Data.TimeSpaceDecided -> Result
+        synthesizePopulateIso x = case Convert.populate x of
+          Left popError -> Failed $ "Populate error: " <> show popError
+          Right sets -> case Convert.synthesize sets of
+            Left synthError -> Failed $ "Synthesize error: " <> show synthError
+            Right y
+              | x == y -> Success
+              | otherwise -> Failed $ "Not equal - x: " <> show x <> ", y: " <> show y
+    it "synthesize <<< populate isomorphism" $
+      liftEffect $ quickCheck' 1000 synthesizePopulateIso
   where
     jsonTest :: forall a
               . Arbitrary a

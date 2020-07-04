@@ -3,6 +3,8 @@ module Timeline.Data.TimeScale where
 import Timeline.Time.MaybeLimit (MaybeLimit)
 import Prelude
 import Data.Tuple.Nested (type (/\), tuple4, uncurry4)
+import Data.Foldable (class Foldable, foldr, foldl, foldMap)
+import Data.Traversable (class Traversable, traverse, sequence)
 import Data.Generic.Rep (class Generic)
 import Data.Generic.Rep.Show (genericShow)
 import Data.Argonaut (class EncodeJson, class DecodeJson, (:=), (~>), jsonEmptyObject, (.:), decodeJson)
@@ -36,6 +38,15 @@ derive newtype instance ordTimeScale :: Ord index => Ord (TimeScale index)
 
 instance functorTimeScale :: Functor TimeScale where
   map f (TimeScale x) = TimeScale x { limit = map f x.limit }
+
+instance foldableTimeScale :: Foldable TimeScale where
+  foldr f acc (TimeScale x) = foldr f acc x.limit
+  foldl f acc (TimeScale x) = foldl f acc x.limit
+  foldMap f (TimeScale x) = foldMap f x.limit
+
+instance traversableTimeScale :: Traversable TimeScale where
+  traverse f (TimeScale x) = (\limit -> TimeScale x { limit = limit }) <$> traverse f x.limit
+  sequence (TimeScale x) = (\limit -> TimeScale x { limit = limit }) <$> sequence x.limit
 
 instance showTimeScale :: Show index => Show (TimeScale index) where
   show = genericShow

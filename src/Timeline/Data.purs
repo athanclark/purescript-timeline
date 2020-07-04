@@ -1,9 +1,10 @@
 module Timeline.Data
   ( TimeSpan(..)
-  , TimelineChild(..)
+  , EventOrTimeSpan(..)
   , Timeline(..)
   , TimeSpace(..)
   , TimeSpaceDecided(..)
+  , getIdTimeSpaceDecided
   , module Timeline.Data.Event
   , module Timeline.Data.TimeScale
   ) where
@@ -34,6 +35,8 @@ import Data.Tuple.Nested
   , get3
   , get4
   )
+import Data.Foldable (class Foldable, foldr, foldl, foldMap)
+import Data.Traversable (class Traversable, traverse, sequence)
 import Data.Vec (Vec)
 import Data.Typelevel.Num (D16)
 import Data.UUID (UUID)
@@ -41,7 +44,6 @@ import Data.UUID (toString, parseUUID, genUUID, toBytes, parseBytesUUID) as UUID
 import Data.UInt (fromInt, toInt) as UInt
 import Data.NonEmpty (NonEmpty(..))
 import Data.Generic.Rep (class Generic)
-import Data.Generic.Rep.Ord (genericCompare)
 import Data.Argonaut (class EncodeJson, class DecodeJson, decodeJson, (.:), (:=), (~>), jsonEmptyObject, fail)
 import Data.ArrayBuffer.Class
   ( class EncodeArrayBuffer
@@ -68,7 +70,7 @@ newtype TimeSpace index
   = TimeSpace
   { timeScale :: TimeScale index
   , timelines :: Array (Timeline index)
-  , siblings :: Array (TimelineChild index)
+  , siblings :: Array (EventOrTimeSpan index)
   -- FIXME add cross-referenced timeline children? Ones that _reference_ multiple timelines, rather than belong to them
   -- non-essential
   , title :: String
@@ -88,11 +90,82 @@ instance functorTimeSpace :: Functor TimeSpace where
         , timeScale = map f x.timeScale
         }
 
-derive newtype instance eqTimeSpace :: Ord index => Eq (TimeSpace index)
+instance foldableTimeSpace :: Foldable TimeSpace where
+  foldr f acc (TimeSpace x) =
+    let
+      siblingsAcc = foldr (\eOrTs acc' -> foldr f acc' eOrTs) acc x.siblings
 
-derive newtype instance ordTimeSpace :: Ord index => Ord (TimeSpace index)
+      timelinesAcc = foldr (\t acc' -> foldr f acc' t) siblingsAcc x.timelines
+    in
+      foldr f timelinesAcc x.timeScale
+  foldl f acc (TimeSpace x) =
+    let
+      timeScaleAcc = foldl f acc x.timeScale
 
-derive newtype instance showTimeSpace :: Show index => Show (TimeSpace index)
+      timelinesAcc = foldl (\acc' t -> foldl f acc' t) timeScaleAcc x.timelines
+    in
+      foldl (\acc' eOrTs -> foldl f acc' eOrTs) timelinesAcc x.siblings
+  foldMap f (TimeSpace x) =
+    foldMap f x.timeScale
+      <> foldMap (\t -> foldMap f t) x.timelines
+      <> foldMap (\eOrTs -> foldMap f eOrTs) x.siblings
+
+instance traversableTimeSpace :: Traversable TimeSpace where
+  traverse f (TimeSpace x) =
+    let
+      go timeScale timelines siblings =
+        TimeSpace
+          x
+            { timeScale = timeScale
+            , timelines = timelines
+            , siblings = siblings
+            }
+    in
+      go <$> traverse f x.timeScale
+        <*> traverse (\t -> traverse f t) x.timelines
+        <*> traverse (\eOrTs -> traverse f eOrTs) x.siblings
+  sequence (TimeSpace x) =
+    let
+      go timeScale timelines siblings =
+        TimeSpace
+          x
+            { timeScale = timeScale
+            , timelines = timelines
+            , siblings = siblings
+            }
+    in
+      go <$> sequence x.timeScale
+        <*> sequence (map sequence x.timelines)
+        <*> sequence (map sequence x.siblings)
+
+instance eqTimeSpace :: Ord index => Eq (TimeSpace index) where
+  eq (TimeSpace x) (TimeSpace y) =
+    x.timeScale == y.timeScale
+      && x.timelines
+      == y.timelines
+      && x.siblings
+      == y.siblings
+      && x.title
+      == y.title
+      && x.description
+      == y.description
+      && x.id
+      == y.id
+
+instance showTimeSpace :: Show index => Show (TimeSpace index) where
+  show (TimeSpace x) =
+    "(TimeSpace {timeScale: " <> show x.timeScale
+      <> ", timelines: "
+      <> show x.timelines
+      <> ", siblings: "
+      <> show x.siblings
+      <> ", title: "
+      <> show x.title
+      <> ", description: "
+      <> show x.description
+      <> ", id: "
+      <> show x.id
+      <> "})"
 
 instance encodeJsonTimeSpace :: EncodeJson index => EncodeJson (TimeSpace index) where
   encodeJson (TimeSpace { timeScale, timelines, siblings, title, description, id }) =
@@ -165,9 +238,8 @@ instance eqTimeSpaceDecided :: Eq TimeSpaceDecided where
     Tuple (TimeSpaceNumber x) (TimeSpaceNumber y) -> x == y
     _ -> false
 
-instance ordTimeSpaceDecided :: Ord TimeSpaceDecided where
-  compare = genericCompare
-
+-- instance ordTimeSpaceDecided :: Ord TimeSpaceDecided where
+--   compare = genericCompare
 instance showTimeSpaceDecided :: Show TimeSpaceDecided where
   show x = case x of
     TimeSpaceNumber y -> "(TimeSpaceNumber " <> show y <> ")"
@@ -221,83 +293,91 @@ instance arbitraryTimeSpaceDecided :: Arbitrary TimeSpaceDecided where
           (TimeSpaceNumber <$> arbitrary)
           []
 
--- TODO morphisms between decided types
+getIdTimeSpaceDecided :: TimeSpaceDecided -> UUID
+getIdTimeSpaceDecided x = case x of
+  TimeSpaceNumber (TimeSpace { id }) -> id
+
 -- ------------------ Timeline
 -- | Types of children in a Timeline
-data TimelineChild index
-  = EventChild (Event index)
-  | TimeSpanChild (TimeSpan index)
+newtype EventOrTimeSpan index
+  = EventOrTimeSpan (Either (Event index) (TimeSpan index))
 
-derive instance genericTimelineChild :: Generic index index' => Generic (TimelineChild index) _
+derive instance genericEventOrTimeSpanData :: Generic index index' => Generic (EventOrTimeSpan index) _
 
-instance eqTimelineChild :: Eq index => Eq (TimelineChild index) where
-  eq x' y' = case Tuple x' y' of
-    Tuple (EventChild x) (EventChild y) -> x == y
-    Tuple (TimeSpanChild x) (TimeSpanChild y) -> x == y
+instance eqEventOrTimeSpanData :: Eq index => Eq (EventOrTimeSpan index) where
+  eq (EventOrTimeSpan x) (EventOrTimeSpan y) = case Tuple x y of
+    Tuple (Left x') (Left y') -> x' == y'
+    Tuple (Right x') (Right y') -> x' == y'
     _ -> false
 
 -- FIXME special kind of comparison between types? Would it break pre-order?
-instance ordTimelineChild :: Ord index => Ord (TimelineChild index) where
-  compare x' y' = case Tuple x' y' of
-    Tuple (EventChild _) (TimeSpanChild _) -> LT
-    Tuple (TimeSpanChild _) (EventChild _) -> GT
-    Tuple (EventChild x) (EventChild y) -> compare x y
-    Tuple (TimeSpanChild x) (TimeSpanChild y) -> compare x y
+-- instance ordEventOrTimeSpanData :: Ord index => Ord (EventOrTimeSpan index) where
+--   compare (EventOrTimeSpan x) (EventOrTimeSpan y) = case Tuple x y of
+--     Tuple (Left x') (Left y') -> compare x' y'
+--     Tuple (Right x') (Right y') -> compare x' y'
+--     Tuple (Left _) (Right _) -> LT
+--     Tuple (Right _) (Left _) -> GT
+instance showEventOrTimeSpanData :: Show index => Show (EventOrTimeSpan index) where
+  show (EventOrTimeSpan x) =
+    let
+      content = case x of
+        Left y -> show y
+        Right y -> show y
+    in
+      "(EventOrTimeSpan " <> content <> ")"
 
-instance showTimelineChild :: Show index => Show (TimelineChild index) where
-  show x = case x of
-    EventChild y -> "(EventChild " <> show y <> ")"
-    TimeSpanChild y -> "(TimeSpanChild " <> show y <> ")"
+instance functorEventOrTimeSpanData :: Functor EventOrTimeSpan where
+  map f (EventOrTimeSpan x) =
+    EventOrTimeSpan
+      $ case x of
+          Left y -> Left (map f y)
+          Right y -> Right (map f y)
 
-instance functorTimelineChild :: Functor TimelineChild where
-  map f x = case x of
-    EventChild y -> EventChild (map f y)
-    TimeSpanChild y -> TimeSpanChild (map f y)
+instance foldableEventOrTimeSpanData :: Foldable EventOrTimeSpan where
+  foldr f acc (EventOrTimeSpan x) = case x of
+    Left y -> foldr f acc y
+    Right y -> foldr f acc y
+  foldl f acc (EventOrTimeSpan x) = case x of
+    Left y -> foldl f acc y
+    Right y -> foldl f acc y
+  foldMap f (EventOrTimeSpan x) = case x of
+    Left y -> foldMap f y
+    Right y -> foldMap f y
 
-instance encodeJsonTimelineChild :: EncodeJson index => EncodeJson (TimelineChild index) where
-  encodeJson x = case x of
-    EventChild y -> "event" := y ~> jsonEmptyObject
-    TimeSpanChild y -> "timeSpan" := y ~> jsonEmptyObject
+instance traversableEventOrTimeSpanData :: Traversable EventOrTimeSpan where
+  traverse f (EventOrTimeSpan x) = case x of
+    Left y -> EventOrTimeSpan <<< Left <$> traverse f y
+    Right y -> EventOrTimeSpan <<< Right <$> traverse f y
+  sequence (EventOrTimeSpan x) = case x of
+    Left y -> EventOrTimeSpan <<< Left <$> sequence y
+    Right y -> EventOrTimeSpan <<< Right <$> sequence y
 
-instance decodeJsonTimelineChild :: DecodeJson index => DecodeJson (TimelineChild index) where
+instance encodeJsonEventOrTimeSpanData :: EncodeJson index => EncodeJson (EventOrTimeSpan index) where
+  encodeJson (EventOrTimeSpan x) = case x of
+    Left y -> "event" := y ~> jsonEmptyObject
+    Right y -> "timeSpan" := y ~> jsonEmptyObject
+
+instance decodeJsonEventOrTimeSpanData :: DecodeJson index => DecodeJson (EventOrTimeSpan index) where
   decodeJson json = do
     o <- decodeJson json
     let
-      decodeEvent = EventChild <$> o .: "event"
+      decodeEvent = Left <$> o .: "event"
 
-      decodeTimeSpan = TimeSpanChild <$> o .: "timeSpan"
-    decodeEvent <|> decodeTimeSpan
+      decodeTimeSpan = Right <$> o .: "timeSpan"
+    EventOrTimeSpan <$> (decodeEvent <|> decodeTimeSpan)
 
-instance encodeArrayBufferTimelineChild :: EncodeArrayBuffer index => EncodeArrayBuffer (TimelineChild index) where
-  putArrayBuffer b o x =
-    putArrayBuffer b o
-      $ case x of
-          EventChild y -> Left y
-          TimeSpanChild y -> Right y
+derive newtype instance encodeArrayBufferEventOrTimeSpanData :: EncodeArrayBuffer index => EncodeArrayBuffer (EventOrTimeSpan index)
 
-instance decodeArrayBufferTimelineChild :: (DecodeArrayBuffer index, DynamicByteLength index) => DecodeArrayBuffer (TimelineChild index) where
-  readArrayBuffer b o =
-    let
-      fromEither eX = case eX of
-        Left y -> EventChild y
-        Right y -> TimeSpanChild y
-    in
-      map fromEither <$> readArrayBuffer b o
+derive newtype instance decodeArrayBufferEventOrTimeSpanData :: (DecodeArrayBuffer index, DynamicByteLength index) => DecodeArrayBuffer (EventOrTimeSpan index)
 
-instance dynamicByteLengthTimelineChild :: DynamicByteLength index => DynamicByteLength (TimelineChild index) where
-  byteLength x =
-    byteLength
-      $ case x of
-          EventChild y -> Left y
-          TimeSpanChild y -> Right y
+derive newtype instance dynamicByteLengthEventOrTimeSpanData :: DynamicByteLength index => DynamicByteLength (EventOrTimeSpan index)
 
-instance arbitraryTimelineChild :: Arbitrary index => Arbitrary (TimelineChild index) where
-  arbitrary = oneOf (NonEmpty (EventChild <$> arbitrary) [ TimeSpanChild <$> arbitrary ])
+derive newtype instance arbitraryEventOrTimeSpanData :: Arbitrary index => Arbitrary (EventOrTimeSpan index)
 
 -- | A set of Timeline children - events and timespans
 newtype Timeline index
   = Timeline
-  { children :: Array (TimelineChild index) -- TODO optional auxillary sorting data
+  { children :: Array (EventOrTimeSpan index) -- TODO optional auxillary sorting data
   -- non-essential
   , name :: String
   , description :: String
@@ -310,9 +390,28 @@ derive instance genericTimeline :: Generic (Timeline index) _
 instance functorTimeline :: Functor Timeline where
   map f (Timeline x) = Timeline x { children = map (map f) x.children }
 
-derive newtype instance eqTimeline :: Ord index => Eq (Timeline index)
+instance foldableTimeline :: Foldable Timeline where
+  foldr f acc (Timeline x) = foldr (\eOrTs acc' -> foldr f acc' eOrTs) acc x.children
+  foldl f acc (Timeline x) = foldl (\acc' eOrTs -> foldl f acc' eOrTs) acc x.children
+  foldMap f (Timeline x) = foldMap (\eOrTs -> foldMap f eOrTs) x.children
 
-derive newtype instance ordTimeline :: Ord index => Ord (Timeline index)
+instance traversableTimeline :: Traversable Timeline where
+  traverse f (Timeline x) =
+    (\children -> Timeline x { children = children })
+      <$> traverse (\eOrTs -> traverse f eOrTs) x.children
+  sequence (Timeline x) =
+    (\children -> Timeline x { children = children })
+      <$> sequence (map sequence x.children)
+
+instance eqTimeline :: Ord index => Eq (Timeline index) where
+  eq (Timeline x) (Timeline y) =
+    x.children == y.children
+      && x.name
+      == y.name
+      && x.description
+      == y.description
+      && x.id
+      == y.id
 
 instance showTimeline :: Show index => Show (Timeline index) where
   show (Timeline { children, name, description, id }) =
@@ -395,9 +494,32 @@ derive instance genericTimeSpan :: Generic index index' => Generic (TimeSpan ind
 instance functorTimeSpan :: Functor TimeSpan where
   map f (TimeSpan x) = TimeSpan x { span = { start: f x.span.start, stop: f x.span.stop } }
 
-derive newtype instance eqTimeSpan :: Eq index => Eq (TimeSpan index)
+instance foldableTimeSpan :: Foldable TimeSpan where
+  foldr f acc (TimeSpan x) = f x.span.start (f x.span.stop acc)
+  foldl f acc (TimeSpan x) = f (f acc x.span.start) x.span.stop
+  foldMap f (TimeSpan x) = f x.span.start <> f x.span.stop
 
-derive newtype instance ordTimeSpan :: Ord index => Ord (TimeSpan index) -- FIXME sort by span first?
+instance traversableTimeSpan :: Traversable TimeSpan where
+  traverse f (TimeSpan x) =
+    (\start stop -> TimeSpan x { span = { start, stop } })
+      <$> f x.span.start
+      <*> f x.span.stop
+  sequence (TimeSpan x) =
+    (\start stop -> TimeSpan x { span = { start, stop } })
+      <$> x.span.start
+      <*> x.span.stop
+
+instance eqTimeSpan :: Eq index => Eq (TimeSpan index) where
+  eq (TimeSpan x) (TimeSpan y) =
+    x.timeSpace == y.timeSpace
+      && x.name
+      == y.name
+      && x.description
+      == y.description
+      && x.id
+      == y.id
+      && x.span
+      == y.span
 
 instance showTimeSpan :: Show index => Show (TimeSpan index) where
   show (TimeSpan x) =
