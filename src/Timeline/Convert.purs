@@ -23,13 +23,11 @@ import Timeline.UI.TimeSpace (TimeSpace(..)) as UI
 import Timeline.UI.TimeSpace.Explore (ExploreTimeSpaces(..)) as UI
 import Timeline.UI.TimeSpace.TimeScale (TimeScale(..)) as UI
 import Timeline.UI.Timeline (Timeline(..)) as UI
-import Timeline.UI.Event (Event(..)) as UI
 import Timeline.UI.TimeSpan (TimeSpan(..)) as UI
 import Timeline.UI.EventOrTimeSpan (EventOrTimeSpanPoly(..)) as UI
 import Timeline.Data
   ( TimeSpaceDecided(..)
   , TimeSpace(..)
-  , TimeScale
   , Timeline(..)
   , EventOrTimeSpan(..)
   , TimeSpan(..)
@@ -39,19 +37,14 @@ import Timeline.Data
   as Data
 import Timeline.Time.Unit (DecidedUnit(..))
 import Timeline.Time.Value (DecidedValue(..))
-import Timeline.Time.Span (Span, makeDecidedSpan, unmakeDecidedSpan)
+import Timeline.Time.Span (makeDecidedSpan, unmakeDecidedSpan)
 import Prelude
 import Data.Maybe (Maybe(..))
 import Data.Either (Either(..), note)
 import Data.Tuple (Tuple(..))
 import Data.Array (snoc, foldM, mapMaybe, concatMap) as Array
 import Data.Traversable (traverse)
-import Data.Generic.Rep (class Generic)
-import Data.Generic.Rep.Show (genericShow)
 import Data.UUID (UUID)
-import Data.UUID (toString) as UUID
-import Foreign.Object (Object)
-import Foreign.Object (union, empty, lookup, insert, member) as Object
 import Partial.Unsafe (unsafePartial) -- FIXME
 
 -- | Translates a recursive `TimeSpaceDecided` into a flat `UISets`.
@@ -350,7 +343,7 @@ synthesizeExploreTimeSpaces sets@(UISets { root }) = case root of
   Nothing -> Left NoRootExists
   Just { id } -> go id
   where
-  go id = do
+  go timeSpaceId = do
     UI.TimeSpace
       { title
     , timeScale: UI.TimeScale { limit }
@@ -358,7 +351,7 @@ synthesizeExploreTimeSpaces sets@(UISets { root }) = case root of
     , timelines
     , siblings
     } <-
-      getTimeSpace id sets
+      getTimeSpace timeSpaceId sets
     let
       getSpans :: Array (UI.EventOrTimeSpanPoly UUID UUID) -> Array UUID
       getSpans = Array.mapMaybe getSpan

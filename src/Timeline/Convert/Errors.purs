@@ -1,12 +1,12 @@
 module Timeline.Convert.Errors where
 
-import Timeline.UI.TimeSpace (TimeSpace(..)) as UI
-import Timeline.UI.Timeline (Timeline(..)) as UI
-import Timeline.UI.Event (Event(..)) as UI
-import Timeline.UI.TimeSpan (TimeSpan(..)) as UI
+import Timeline.UI.TimeSpace (TimeSpace) as UI
+import Timeline.UI.Timeline (Timeline) as UI
+import Timeline.UI.Event (Event) as UI
+import Timeline.UI.TimeSpan (TimeSpan) as UI
 import Timeline.Data (TimeScale) as Data
-import Timeline.Time.Unit (DecidedUnit(..))
-import Timeline.Time.Value (DecidedValue(..))
+import Timeline.Time.Unit (DecidedUnit)
+import Timeline.Time.Value (DecidedValue)
 import Timeline.Time.Span (Span)
 import Prelude
 import Data.UUID (UUID)

@@ -4,31 +4,18 @@ import Timeline.Time.MaybeLimit
   ( DecidedMaybeLimit(DecidedMaybeLimitNumber)
   , MaybeLimit(NothingLimit)
   )
-import Timeline.UI.Settings (Settings(..))
 import Prelude
-import Data.Maybe (Maybe(..))
-import Data.Either (Either(..))
-import Data.Default (class Default, def)
+import Data.Default (class Default)
 import Data.Generic.Rep (class Generic)
 import Data.Argonaut
   ( class EncodeJson
   , class DecodeJson
-  , encodeJson
   , decodeJson
   , (:=)
   , (.:)
   , (~>)
   , jsonEmptyObject
-  , stringify
-  , jsonParser
   )
-import Web.HTML (window)
-import Web.HTML.Window (localStorage)
-import Web.Storage.Storage (setItem, getItem, removeItem)
-import Effect (Effect)
-import Effect.Exception (throw)
-import Zeta.Types (READ, WRITE) as S
-import IxZeta (IxSignal, make, get, set, subscribeDiffLight)
 import Test.QuickCheck (class Arbitrary, arbitrary)
 import Test.QuickCheck.UTF8String (genString)
 

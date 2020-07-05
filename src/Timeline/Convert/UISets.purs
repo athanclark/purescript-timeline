@@ -5,7 +5,6 @@ import Timeline.UI.TimeSpace (TimeSpace(..)) as UI
 import Timeline.UI.Timeline (Timeline(..)) as UI
 import Timeline.UI.Event (Event(..)) as UI
 import Timeline.UI.TimeSpan (TimeSpan(..)) as UI
-import Timeline.UI.EventOrTimeSpan (EventOrTimeSpanPoly(..)) as UI
 import Prelude
 import Data.Maybe (Maybe(..))
 import Data.Either (Either(..), note)
