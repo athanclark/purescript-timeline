@@ -117,11 +117,14 @@ localstorageSignalKey = "localstorage"
 localstorageKey :: String
 localstorageKey = "TimeSpace"
 
--- | Chosen timeline name on boot, disregarding the shared signal
+-- | Create the "viewed time space" signal on boot, where the initial
+-- | time space is synthesized by `UISets`.
 newTimeSpaceSignal ::
-  IxSignal ( read :: S.READ ) Settings ->
+  { settingsSignal :: IxSignal ( read :: S.READ ) Settings
+  , initialTimeSpace :: TimeSpace
+  } ->
   Effect (IxSignal ( read :: S.READ, write :: S.WRITE ) TimeSpace)
-newTimeSpaceSignal settingsSignal = do
+newTimeSpaceSignal { settingsSignal, initialTimeSpace } = do
   store <- window >>= localStorage
   mItem <- getItem localstorageKey store
   item <- case mItem of
