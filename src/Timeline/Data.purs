@@ -20,6 +20,7 @@ import Timeline.Time.Span
   )
 import Timeline.Data.Event (Event(..))
 import Timeline.Data.TimeScale (TimeScale(..))
+import Timeline.ID.TimeSpace (TimeSpaceID)
 import Prelude
 import Data.Maybe (Maybe(..))
 import Data.Either (Either(..))
@@ -75,7 +76,7 @@ newtype TimeSpace index
   -- non-essential
   , title :: String
   , description :: String
-  , id :: UUID
+  , id :: TimeSpaceID
   -- TODO markers, metrics & graduation
   }
 
@@ -179,7 +180,7 @@ instance encodeJsonTimeSpace :: EncodeJson index => EncodeJson (TimeSpace index)
       ~> "description"
       := description
       ~> "id"
-      := UUID.toString id
+      := id
       ~> jsonEmptyObject
 
 instance decodeJsonTimeSpace :: (DecodeJson index, Ord index) => DecodeJson (TimeSpace index) where
@@ -190,32 +191,25 @@ instance decodeJsonTimeSpace :: (DecodeJson index, Ord index) => DecodeJson (Tim
     siblings <- o .: "siblings"
     title <- o .: "title"
     description <- o .: "description"
-    id' <- o .: "id"
-    case UUID.parseUUID id' of
-      Nothing -> fail $ "Can't parse UUID: " <> id'
-      Just id ->
-        pure
-          $ TimeSpace
-              { timeScale, timelines, siblings, title, description, id }
+    id <- o .: "id"
+    pure
+      $ TimeSpace
+          { timeScale, timelines, siblings, title, description, id }
 
 instance encodeArrayBufferTimeSpace :: EncodeArrayBuffer index => EncodeArrayBuffer (TimeSpace index) where
-  putArrayBuffer b o (TimeSpace { timeScale, timelines, siblings, title, description, id }) = putArrayBuffer b o (tuple6 timeScale timelines siblings title description (toBytesUUID id))
+  putArrayBuffer b o (TimeSpace { timeScale, timelines, siblings, title, description, id }) = putArrayBuffer b o (tuple6 timeScale timelines siblings title description id)
 
 instance decodeArrayBufferTimeSpace :: (DecodeArrayBuffer index, DynamicByteLength index, Ord index) => DecodeArrayBuffer (TimeSpace index) where
   readArrayBuffer b o = do
     let
-      go :: _ /\ _ /\ _ /\ _ /\ _ /\ _ /\ Unit -> Effect (Maybe (TimeSpace index))
+      go :: _ /\ _ /\ _ /\ _ /\ _ /\ _ /\ Unit -> TimeSpace index
       go =
-        uncurry6 \timeScale timelines siblings title description id' -> case parseBytesUUID id' of
-          Nothing -> throw $ "Can't parse UUID: " <> show id'
-          Just id -> pure $ Just $ TimeSpace { timeScale, timelines, siblings, title, description, id }
-    mXs <- readArrayBuffer b o
-    case mXs of
-      Nothing -> pure Nothing
-      Just xs -> go xs
+        uncurry6 \timeScale timelines siblings title description id ->
+          TimeSpace { timeScale, timelines, siblings, title, description, id }
+    map go <$> readArrayBuffer b o
 
 instance dynamicByteLengthTimeSpace :: DynamicByteLength index => DynamicByteLength (TimeSpace index) where
-  byteLength (TimeSpace { timeScale, timelines, siblings, title, description, id }) = byteLength (tuple6 timeScale timelines siblings title description (toBytesUUID id))
+  byteLength (TimeSpace { timeScale, timelines, siblings, title, description, id }) = byteLength (tuple6 timeScale timelines siblings title description id)
 
 instance arbitraryTimeSpace :: (Arbitrary index, Ord index) => Arbitrary (TimeSpace index) where
   arbitrary = do
@@ -224,7 +218,7 @@ instance arbitraryTimeSpace :: (Arbitrary index, Ord index) => Arbitrary (TimeSp
     siblings <- sized \s -> resize (s `div` 4) arbitrary
     title <- genString
     description <- genString
-    id <- pure (unsafePerformEffect UUID.genUUID)
+    id <- arbitrary
     pure (TimeSpace { timeScale, timelines, siblings, title, description, id })
 
 -- | All possible Human Time Indicies, with their instances assumed existing
@@ -293,7 +287,7 @@ instance arbitraryTimeSpaceDecided :: Arbitrary TimeSpaceDecided where
           (TimeSpaceNumber <$> arbitrary)
           []
 
-getIdTimeSpaceDecided :: TimeSpaceDecided -> UUID
+getIdTimeSpaceDecided :: TimeSpaceDecided -> TimeSpaceID
 getIdTimeSpaceDecided x = case x of
   TimeSpaceNumber (TimeSpace { id }) -> id
 

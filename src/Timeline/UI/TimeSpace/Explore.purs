@@ -1,5 +1,6 @@
 module Timeline.UI.TimeSpace.Explore where
 
+import Timeline.ID.TimeSpace (TimeSpaceID(..))
 import Timeline.Time.MaybeLimit (DecidedMaybeLimit(..), MaybeLimit(..))
 import Prelude
 import Data.Maybe (Maybe(..))
@@ -18,7 +19,7 @@ newtype ExploreTimeSpaces
   = ExploreTimeSpaces
   { title :: String
   , limit :: DecidedMaybeLimit
-  , id :: UUID
+  , id :: TimeSpaceID
   , children :: Array ExploreTimeSpaces
   }
 
@@ -32,29 +33,29 @@ instance defaultExploreTimeSpaces :: Default ExploreTimeSpaces where
                 { begin: 1234.0
                 , end: 5678.0
                 }
-      , id: unsafePerformEffect UUID.genUUID
+      , id: TimeSpaceID (unsafePerformEffect UUID.genUUID)
       , children:
           [ ExploreTimeSpaces
               { title: "TimeSpace Child 1"
               , limit: DecidedMaybeLimitNumber $ JustLimitBounds { begin: 0.0, end: 1.0 }
-              , id: unsafePerformEffect UUID.genUUID
+              , id: TimeSpaceID (unsafePerformEffect UUID.genUUID)
               , children: []
               }
           , ExploreTimeSpaces
               { title: "TimeSpace Child 2"
               , limit: DecidedMaybeLimitNumber $ JustLimitBounds { begin: 1.0, end: 2.0 }
-              , id: unsafePerformEffect UUID.genUUID
+              , id: TimeSpaceID (unsafePerformEffect UUID.genUUID)
               , children:
                   [ ExploreTimeSpaces
                       { title: "TimeSpace GrandChild 1"
                       , limit: DecidedMaybeLimitNumber $ JustLimitBounds { begin: 2.0, end: 3.0 }
-                      , id: unsafePerformEffect UUID.genUUID
+                      , id: TimeSpaceID (unsafePerformEffect UUID.genUUID)
                       , children: []
                       }
                   , ExploreTimeSpaces
                       { title: "TimeSpace GrandChild 2"
                       , limit: DecidedMaybeLimitNumber $ JustLimitBounds { begin: 4.0, end: 5.0 }
-                      , id: unsafePerformEffect UUID.genUUID
+                      , id: TimeSpaceID (unsafePerformEffect UUID.genUUID)
                       , children: []
                       }
                   ]
@@ -62,7 +63,7 @@ instance defaultExploreTimeSpaces :: Default ExploreTimeSpaces where
           , ExploreTimeSpaces
               { title: "TimeSpace Child 3"
               , limit: DecidedMaybeLimitNumber $ JustLimitBounds { begin: 6.0, end: 7.0 }
-              , id: unsafePerformEffect UUID.genUUID
+              , id: TimeSpaceID (unsafePerformEffect UUID.genUUID)
               , children: []
               }
           ]
@@ -73,7 +74,7 @@ newtype ExploreTimeSpacesWithAux aux
   = ExploreTimeSpacesWithAux
   { title :: String
   , limit :: DecidedMaybeLimit
-  , id :: UUID
+  , id :: TimeSpaceID
   , children ::
       Maybe
         { aux :: aux
@@ -96,7 +97,7 @@ exploreTimeSpacesWithAux defAux (ExploreTimeSpaces { title, limit, id, children 
             { aux: defAux
             , childrenValues:
                 let
-                  go x@(ExploreTimeSpaces { id: id' }) = Tuple (UUID.toString id') (exploreTimeSpacesWithAux defAux x)
+                  go x@(ExploreTimeSpaces { id: id' }) = Tuple (show id') (exploreTimeSpacesWithAux defAux x)
                 in
                   IxArray.fromFoldable (map go children)
             }
@@ -117,7 +118,7 @@ updateExploreTimeSpacesWithAux defAux (ExploreTimeSpacesWithAux x) (ExploreTimeS
           Just
             $ let
                 go :: forall a. (ExploreTimeSpaces -> a) -> ExploreTimeSpaces -> Tuple String a
-                go f timeSpace@(ExploreTimeSpaces { id }) = Tuple (UUID.toString id) (f timeSpace)
+                go f timeSpace@(ExploreTimeSpaces { id }) = Tuple (show id) (f timeSpace)
 
                 yChildrenValues :: forall a. (ExploreTimeSpaces -> a) -> IxArray a
                 yChildrenValues f = IxArray.fromFoldable (map (go f) y.children)

@@ -1,13 +1,12 @@
 module Timeline.UI.TimeSpan where
 
+import Timeline.ID.TimeSpace (TimeSpaceID)
 import Timeline.Time.Span (DecidedSpan(..))
 import Prelude
 import Data.Maybe (Maybe(..))
 import Data.UUID (UUID)
 import Data.UUID (toString, parseUUID, genUUID) as UUID
 import Data.Generic.Rep (class Generic)
-import Data.NonEmpty (NonEmpty(..))
-import Data.Traversable (traverse)
 import Data.Default (class Default)
 import Data.Argonaut
   ( class EncodeJson
@@ -21,7 +20,6 @@ import Data.Argonaut
   )
 import Effect.Unsafe (unsafePerformEffect)
 import Test.QuickCheck (class Arbitrary, arbitrary)
-import Test.QuickCheck.Gen (oneOf)
 import Test.QuickCheck.UTF8String (genString)
 
 -- | An inclusive span of time from `startIndex` to `stopIndex`.
@@ -32,7 +30,7 @@ newtype TimeSpan
   { name :: String
   , description :: String
   , span :: DecidedSpan
-  , timeSpace :: Maybe UUID
+  , timeSpace :: Maybe TimeSpaceID
   , id :: UUID -- TODO trim the fat later
   }
 
@@ -50,7 +48,7 @@ instance encodeJsonTimeSpan :: EncodeJson TimeSpan where
       ~> "span"
       := span
       ~> "timeSpace"
-      := map UUID.toString timeSpace
+      := timeSpace
       ~> "id"
       := UUID.toString id
       ~> jsonEmptyObject
@@ -65,7 +63,7 @@ instance decodeJsonTimeSpan :: DecodeJson TimeSpan where
       getUUID s = case UUID.parseUUID s of
         Nothing -> fail $ "Couldn't parse UUID: " <> s
         Just x -> pure x
-    timeSpace <- o .: "timeSpace" >>= traverse getUUID
+    timeSpace <- o .: "timeSpace"
     id <- o .: "id" >>= getUUID
     pure $ TimeSpan { name, description, span, timeSpace, id }
 
@@ -74,7 +72,7 @@ instance arbitraryTimeSpan :: Arbitrary TimeSpan where
     name <- genString
     description <- genString
     span <- arbitrary
-    timeSpace <- oneOf $ NonEmpty (pure Nothing) [ pure $ Just $ unsafePerformEffect UUID.genUUID ]
+    timeSpace <- arbitrary
     let
       id = unsafePerformEffect UUID.genUUID
     pure (TimeSpan { name, description, span, timeSpace, id })

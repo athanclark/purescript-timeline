@@ -5,6 +5,7 @@ import Timeline.UI.Timeline (Timeline) as UI
 import Timeline.UI.Event (Event) as UI
 import Timeline.UI.TimeSpan (TimeSpan) as UI
 import Timeline.Data (TimeScale) as Data
+import Timeline.ID.TimeSpace (TimeSpaceID)
 import Timeline.Time.Unit (DecidedUnit)
 import Timeline.Time.Value (DecidedValue)
 import Timeline.Time.Span (Span)
@@ -18,7 +19,7 @@ data PopulateError
     { decidedUnit :: DecidedUnit
     , timeScale :: Data.TimeScale DecidedValue
     }
-  | TimeSpaceExists UI.TimeSpace
+  | TimeSpaceExists { timeSpace :: UI.TimeSpace, sets :: String }
   | TimelineExists UI.Timeline
   | SiblingEventExists UI.Event
   | SiblingTimeSpanExists UI.TimeSpan
@@ -33,7 +34,7 @@ instance showPopulateError :: Show PopulateError where
   show = genericShow
 
 data SynthesizeError
-  = TimeSpaceDoesntExist UUID
+  = TimeSpaceDoesntExist TimeSpaceID
   | TimelineDoesntExist UUID
   | SiblingEventDoesntExist UUID
   | SiblingTimeSpanDoesntExist UUID

@@ -5,6 +5,7 @@ import Timeline.UI.TimeSpace (TimeSpace(..)) as UI
 import Timeline.UI.Timeline (Timeline(..)) as UI
 import Timeline.UI.Event (Event(..)) as UI
 import Timeline.UI.TimeSpan (TimeSpan(..)) as UI
+import Timeline.ID.TimeSpace (TimeSpaceID)
 import Prelude
 import Data.Maybe (Maybe(..))
 import Data.Either (Either(..), note)
@@ -23,7 +24,7 @@ newtype UISets
   , siblingTimeSpans :: Object UI.TimeSpan
   , childEvents :: Object UI.Event
   , childTimeSpans :: Object UI.TimeSpan
-  , root :: Maybe { id :: UUID }
+  , root :: Maybe TimeSpaceID
   }
 
 -- FIXME may need reference to their parent?
@@ -62,10 +63,10 @@ instance monoidUISets :: Monoid UISets where
 addTimeSpace :: UI.TimeSpace -> UISets -> Either PopulateError UISets
 addTimeSpace x@(UI.TimeSpace { id }) (UISets xs) =
   let
-    id' = UUID.toString id
+    id' = show id
   in
     if Object.member id' xs.timeSpaces then
-      Left (TimeSpaceExists x)
+      Left (TimeSpaceExists { timeSpace: x, sets: show (UISets xs) })
     else
       Right
         $ UISets
@@ -77,7 +78,7 @@ addTimeSpace x@(UI.TimeSpace { id }) (UISets xs) =
 addTimeSpace' :: UI.TimeSpace -> UISets -> UISets
 addTimeSpace' x@(UI.TimeSpace { id }) (UISets xs) =
   let
-    id' = UUID.toString id
+    id' = show id
   in
     UISets
       xs
@@ -85,8 +86,8 @@ addTimeSpace' x@(UI.TimeSpace { id }) (UISets xs) =
         }
 
 -- | Looks for an already flat time space in the sets
-getTimeSpace :: UUID -> UISets -> Either SynthesizeError UI.TimeSpace
-getTimeSpace id (UISets { timeSpaces }) = note (TimeSpaceDoesntExist id) (Object.lookup (UUID.toString id) timeSpaces)
+getTimeSpace :: TimeSpaceID -> UISets -> Either SynthesizeError UI.TimeSpace
+getTimeSpace id (UISets { timeSpaces }) = note (TimeSpaceDoesntExist id) (Object.lookup (show id) timeSpaces)
 
 -- | Includes an already flat timeline - doesn't verify constituents
 addTimeline :: UI.Timeline -> UISets -> Either PopulateError UISets
@@ -234,5 +235,5 @@ getChildTimeSpan :: UUID -> UISets -> Either SynthesizeError UI.TimeSpan
 getChildTimeSpan id (UISets { childTimeSpans }) = note (ChildTimeSpanDoesntExists id) (Object.lookup (UUID.toString id) childTimeSpans)
 
 -- | Assigns the root field of a set
-setRoot :: UUID -> UISets -> UISets
-setRoot id (UISets x) = UISets x { root = Just { id } }
+setRoot :: TimeSpaceID -> UISets -> UISets
+setRoot id (UISets x) = UISets x { root = Just id }

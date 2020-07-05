@@ -3,6 +3,7 @@ module Timeline.UI.TimeSpace where
 import Timeline.UI.TimeSpace.TimeScale (TimeScale)
 import Timeline.UI.EventOrTimeSpan (EventOrTimeSpanPoly(..))
 import Timeline.UI.Settings (Settings(..))
+import Timeline.ID.TimeSpace (TimeSpaceID(..))
 import Prelude
 import Data.Maybe (Maybe(..))
 import Data.Either (Either(..))
@@ -35,7 +36,7 @@ import Web.Storage.Storage (setItem, getItem, removeItem)
 import Zeta.Types (READ, WRITE) as S
 import IxZeta (IxSignal, set, get, make, subscribeDiffLight)
 import Test.QuickCheck (class Arbitrary, arbitrary)
-import Test.QuickCheck.Gen (oneOf, arrayOf)
+import Test.QuickCheck.Gen (arrayOf, oneOf)
 import Test.QuickCheck.UTF8String (genString)
 
 newtype TimeSpace
@@ -45,7 +46,7 @@ newtype TimeSpace
   , timeScale :: TimeScale
   , siblings :: Array (EventOrTimeSpanPoly UUID UUID) -- TODO manual field sorting
   , timelines :: Array UUID
-  , id :: UUID -- TODO trim the fat later
+  , id :: TimeSpaceID
   }
 
 derive instance genericTimeSpace :: Generic TimeSpace _
@@ -66,7 +67,7 @@ instance encodeJsonTimeSpace :: EncodeJson TimeSpace where
       ~> "timelines"
       := map UUID.toString timelines
       ~> "id"
-      := UUID.toString id
+      := id
       ~> jsonEmptyObject
 
 instance decodeJsonTimeSpace :: DecodeJson TimeSpace where
@@ -85,7 +86,7 @@ instance decodeJsonTimeSpace :: DecodeJson TimeSpace where
     timeScale <- o .: "timeScale"
     siblings <- o .: "siblings" >>= traverse getIds
     timelines <- o .: "timelines" >>= traverse getUUID
-    id <- o .: "id" >>= getUUID
+    id <- o .: "id"
     pure (TimeSpace { title, description, timeScale, siblings, timelines, id })
 
 instance arbitraryEvent :: Arbitrary TimeSpace where
@@ -97,7 +98,7 @@ instance arbitraryEvent :: Arbitrary TimeSpace where
       genId = pure (unsafePerformEffect UUID.genUUID)
     siblings <- arrayOf $ EventOrTimeSpanPoly <$> oneOf (NonEmpty (Left <$> genId) [ Right <$> genId ])
     timelines <- arrayOf genId
-    id <- genId
+    id <- arbitrary
     pure (TimeSpace { title, description, timeScale, siblings, timelines, id })
 
 instance defaultTimeSpace :: Default TimeSpace where
@@ -108,7 +109,7 @@ instance defaultTimeSpace :: Default TimeSpace where
       , timeScale: def
       , siblings: []
       , timelines: []
-      , id: unsafePerformEffect UUID.genUUID
+      , id: TimeSpaceID (unsafePerformEffect UUID.genUUID)
       }
 
 localstorageSignalKey :: String

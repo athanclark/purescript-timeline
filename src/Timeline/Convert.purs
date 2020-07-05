@@ -35,6 +35,7 @@ import Timeline.Data
   , getIdTimeSpaceDecided
   )
   as Data
+import Timeline.ID.TimeSpace (TimeSpaceID)
 import Timeline.Time.Unit (DecidedUnit(..))
 import Timeline.Time.Value (DecidedValue(..))
 import Timeline.Time.Span (makeDecidedSpan, unmakeDecidedSpan)
@@ -222,9 +223,9 @@ populateChildTimeSpan ( Data.TimeSpan
 synthesize :: UISets -> Either SynthesizeError Data.TimeSpaceDecided
 synthesize sets@(UISets xs) = case xs.root of
   Nothing -> Left NoRootExists
-  Just { id } -> synthesizeTimeSpaceDecided id sets
+  Just id -> synthesizeTimeSpaceDecided id sets
 
-synthesizeTimeSpaceDecided :: UUID -> UISets -> Either SynthesizeError Data.TimeSpaceDecided
+synthesizeTimeSpaceDecided :: TimeSpaceID -> UISets -> Either SynthesizeError Data.TimeSpaceDecided
 synthesizeTimeSpaceDecided id sets = do
   Tuple decidedUnit timeSpace <- synthesizeTimeSpace id sets
   unsafePartial
@@ -238,7 +239,7 @@ synthesizeTimeSpaceDecided id sets = do
           timeSpace' <- traverse undecideValue timeSpace
           pure (Data.TimeSpaceNumber timeSpace')
 
-synthesizeTimeSpace :: UUID -> UISets -> Either SynthesizeError (Tuple DecidedUnit (Data.TimeSpace DecidedValue))
+synthesizeTimeSpace :: TimeSpaceID -> UISets -> Either SynthesizeError (Tuple DecidedUnit (Data.TimeSpace DecidedValue))
 synthesizeTimeSpace id sets = do
   UI.TimeSpace
     { title
@@ -341,8 +342,9 @@ synthesizeChildEventOrTimeSpan (UI.EventOrTimeSpanPoly eOrTs) sets = case eOrTs 
 synthesizeExploreTimeSpaces :: UISets -> Either SynthesizeError UI.ExploreTimeSpaces
 synthesizeExploreTimeSpaces sets@(UISets { root }) = case root of
   Nothing -> Left NoRootExists
-  Just { id } -> go id
+  Just id -> go id
   where
+  go :: TimeSpaceID -> Either SynthesizeError UI.ExploreTimeSpaces
   go timeSpaceId = do
     UI.TimeSpace
       { title
