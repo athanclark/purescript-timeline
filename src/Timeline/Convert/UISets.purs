@@ -5,6 +5,7 @@ import Timeline.UI.TimeSpace (TimeSpace(..)) as UI
 import Timeline.UI.Timeline (Timeline(..)) as UI
 import Timeline.UI.Event (Event(..)) as UI
 import Timeline.UI.TimeSpan (TimeSpan(..)) as UI
+import Timeline.UI.EventOrTimeSpan (EventOrTimeSpanPoly(..), EventOrTimeSpan(..)) as UI
 import Timeline.ID.TimeSpace (TimeSpaceID)
 import Timeline.ID.Timeline (TimelineID)
 import Timeline.ID.Event (EventID)
@@ -177,6 +178,11 @@ addSiblingTimeSpan' x@(UI.TimeSpan { id }) (UISets xs) =
 getSiblingTimeSpan :: TimeSpanID -> UISets -> Either SynthesizeError UI.TimeSpan
 getSiblingTimeSpan id (UISets { siblingTimeSpans }) = note (SiblingTimeSpanDoesntExist id) (Object.lookup (show id) siblingTimeSpans)
 
+getSibling :: UI.EventOrTimeSpanPoly EventID TimeSpanID -> UISets -> Either SynthesizeError UI.EventOrTimeSpan
+getSibling (UI.EventOrTimeSpanPoly eOrTs) sets = case eOrTs of
+  Left e -> UI.EventOrTimeSpan <<< Left <$> getSiblingEvent e sets
+  Right ts -> UI.EventOrTimeSpan <<< Right <$> getSiblingTimeSpan ts sets
+
 -- | Includes an already flat event as a child - doesn't verify constituents
 addChildEvent :: UI.Event -> UISets -> Either PopulateError UISets
 addChildEvent x@(UI.Event { id }) (UISets xs) =
@@ -234,6 +240,11 @@ addChildTimeSpan' x@(UI.TimeSpan { id }) (UISets xs) =
 -- | Looks for an already flat time span (as a child) in the sets
 getChildTimeSpan :: TimeSpanID -> UISets -> Either SynthesizeError UI.TimeSpan
 getChildTimeSpan id (UISets { childTimeSpans }) = note (ChildTimeSpanDoesntExists id) (Object.lookup (show id) childTimeSpans)
+
+getChild :: UI.EventOrTimeSpanPoly EventID TimeSpanID -> UISets -> Either SynthesizeError UI.EventOrTimeSpan
+getChild (UI.EventOrTimeSpanPoly eOrTs) sets = case eOrTs of
+  Left e -> UI.EventOrTimeSpan <<< Left <$> getChildEvent e sets
+  Right ts -> UI.EventOrTimeSpan <<< Right <$> getChildTimeSpan ts sets
 
 -- | Assigns the root field of a set
 setRoot :: TimeSpaceID -> UISets -> UISets
