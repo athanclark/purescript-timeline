@@ -7,13 +7,10 @@ import Data.Tuple (Tuple(..))
 import Data.UUID (UUID)
 import Data.UUID (genUUID, toString) as UUID
 import Data.Array (uncons, unsnoc, snoc, foldl, foldr, length) as Array
-import Data.Default (class Default, def)
+import Data.Default (class Default)
 import Data.Array.Indexed (IxArray)
 import Data.Array.Indexed (intoFrom, update', lookup, fromFoldable) as IxArray
-import Effect (Effect)
 import Effect.Unsafe (unsafePerformEffect)
-import Zeta.Types (READ, WRITE) as S
-import IxZeta (IxSignal, make) as IxSig
 import Partial.Unsafe (unsafePartial)
 
 -- | A rose tree of simplified recursive timespaces.
@@ -83,9 +80,6 @@ newtype ExploreTimeSpacesWithAux aux
         , childrenValues :: IxArray (ExploreTimeSpacesWithAux aux)
         }
   }
-
-newExploreTimeSpacesSignal :: Effect (IxSig.IxSignal ( read :: S.READ, write :: S.WRITE ) ExploreTimeSpaces)
-newExploreTimeSpacesSignal = IxSig.make def
 
 -- | Initial state for explore time spaces
 exploreTimeSpacesWithAux :: forall aux. aux -> ExploreTimeSpaces -> ExploreTimeSpacesWithAux aux
