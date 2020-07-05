@@ -7,13 +7,12 @@ import Timeline.UI.Event (Event) as UI
 import Timeline.UI.TimeSpan (TimeSpan) as UI
 import Timeline.UI.EventOrTimeSpan (EventOrTimeSpan) as UI
 import Timeline.UI.Settings (Settings) as UI
-import Timeline.UI.TimeSpaceName (TimeSpaceName) as UI
-import Timeline.UI.TimeScale (TimeScale) as UI
 import Timeline.UI.Timeline (Timeline) as UI
-import Timeline.UI.Timelines (Timelines) as UI
+import Timeline.UI.Timeline.Children (Children) as UI
 import Timeline.UI.TimeSpace (TimeSpace) as UI
-import Timeline.UI.Children (Children) as UI
-import Timeline.UI.Siblings (Siblings) as UI
+import Timeline.UI.TimeSpace.TimeScale (TimeScale) as UI
+import Timeline.UI.TimeSpace.Timelines (Timelines) as UI
+import Timeline.UI.TimeSpace.Siblings (Siblings) as UI
 import Timeline.Convert (populate, synthesize) as Convert
 
 import Prelude
@@ -65,7 +64,6 @@ tests = do
       jsonTest "TimeSpan" (Proxy :: Proxy UI.TimeSpan)
       jsonTest "EventOrTimeSpan" (Proxy :: Proxy UI.EventOrTimeSpan)
       jsonTest "Settings" (Proxy :: Proxy UI.Settings)
-      jsonTest "TimeSpaceName" (Proxy :: Proxy UI.TimeSpaceName)
       jsonTest "TimeScale" (Proxy :: Proxy UI.TimeScale)
       jsonTest "Timeline" (Proxy :: Proxy UI.Timeline)
       jsonTest "Timelines" (Proxy :: Proxy UI.Timelines)

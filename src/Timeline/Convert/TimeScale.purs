@@ -3,7 +3,7 @@ module Timeline.Convert.TimeScale where
 import Timeline.Time.Unit (DecidedUnit)
 import Timeline.Time.Value (DecidedValue)
 import Timeline.Time.MaybeLimit (makeDecidedMaybeLimitViaMaybeLimit, unmakeDecidedMaybeLimitWithMaybeLimit)
-import Timeline.UI.TimeScale (TimeScale(..)) as UI
+import Timeline.UI.TimeSpace.TimeScale (TimeScale(..)) as UI
 import Timeline.Data.TimeScale (TimeScale(..)) as Data
 import Data.Maybe (Maybe(..))
 

@@ -1,27 +1,39 @@
 module Timeline.UI.TimeSpace where
 
-import Timeline.UI.TimeScale (TimeScale)
+import Timeline.UI.TimeSpace.TimeScale (TimeScale)
 import Timeline.UI.EventOrTimeSpan (EventOrTimeSpanPoly(..))
+import Timeline.UI.Settings (Settings(..))
 import Prelude
 import Data.Maybe (Maybe(..))
 import Data.Either (Either(..))
 import Data.NonEmpty (NonEmpty(..))
 import Data.Bifunctor (bimap)
 import Data.Traversable (traverse)
+import Data.Default (class Default, def)
 import Data.UUID (UUID)
 import Data.UUID (toString, parseUUID, genUUID) as UUID
 import Data.Generic.Rep (class Generic)
 import Data.Argonaut
   ( class EncodeJson
   , class DecodeJson
+  , encodeJson
   , decodeJson
   , (:=)
   , (~>)
   , jsonEmptyObject
   , (.:)
   , fail
+  , jsonParser
+  , stringify
   )
+import Effect (Effect)
 import Effect.Unsafe (unsafePerformEffect)
+import Effect.Exception (throw)
+import Web.HTML (window)
+import Web.HTML.Window (localStorage)
+import Web.Storage.Storage (setItem, getItem, removeItem)
+import Zeta.Types (READ, WRITE) as S
+import IxZeta (IxSignal, set, get, make, subscribeDiffLight)
 import Test.QuickCheck (class Arbitrary, arbitrary)
 import Test.QuickCheck.Gen (oneOf, arrayOf)
 import Test.QuickCheck.UTF8String (genString)
@@ -87,3 +99,51 @@ instance arbitraryEvent :: Arbitrary TimeSpace where
     timelines <- arrayOf genId
     id <- genId
     pure (TimeSpace { title, description, timeScale, siblings, timelines, id })
+
+instance defaultTimeSpace :: Default TimeSpace where
+  def =
+    TimeSpace
+      { title: "TimeSpace Name"
+      , description: ""
+      , timeScale: def
+      , siblings: []
+      , timelines: []
+      , id: unsafePerformEffect UUID.genUUID
+      }
+
+localstorageSignalKey :: String
+localstorageSignalKey = "localstorage"
+
+localstorageKey :: String
+localstorageKey = "TimeSpace"
+
+-- | Chosen timeline name on boot, disregarding the shared signal
+newTimeSpaceSignal ::
+  IxSignal ( read :: S.READ ) Settings ->
+  Effect (IxSignal ( read :: S.READ, write :: S.WRITE ) TimeSpace)
+newTimeSpaceSignal settingsSignal = do
+  store <- window >>= localStorage
+  mItem <- getItem localstorageKey store
+  item <- case mItem of
+    Nothing -> pure def
+    Just s -> case jsonParser s >>= decodeJson of
+      Left e -> throw $ "Couldn't parse TimeSpace: " <> e
+      Right x -> pure x
+  sig <- make item
+  let
+    handler x = do
+      Settings { localCacheTilExport } <- get settingsSignal
+      when localCacheTilExport
+        $ setItem localstorageKey (stringify (encodeJson x)) store
+  subscribeDiffLight localstorageSignalKey handler sig
+  pure sig
+
+clearTimeSpaceCache :: Effect Unit
+clearTimeSpaceCache = do
+  store <- window >>= localStorage
+  removeItem localstorageKey store
+
+setDefaultTimeSpace ::
+  IxSignal ( write :: S.WRITE ) TimeSpace ->
+  Effect Unit
+setDefaultTimeSpace timeSpaceSignal = set def timeSpaceSignal

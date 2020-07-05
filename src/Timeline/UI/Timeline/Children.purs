@@ -1,4 +1,4 @@
-module Timeline.UI.Siblings where
+module Timeline.UI.Timeline.Children where
 
 import Timeline.Time.Value (DecidedValue(..))
 import Timeline.Time.Span (DecidedSpan(..))
@@ -21,23 +21,23 @@ import Web.Storage.Storage (setItem, getItem, removeItem)
 import Zeta.Types (READ, WRITE) as S
 import IxZeta (IxSignal, make, get, set, subscribeDiffLight)
 
-newtype Siblings
-  = Siblings (Array EventOrTimeSpan)
+newtype Children
+  = Children (Array EventOrTimeSpan)
 
-derive instance genericSiblings :: Generic Siblings _
+derive instance genericChildren :: Generic Children _
 
-derive newtype instance eqSiblings :: Eq Siblings
+derive newtype instance eqChildren :: Eq Children
 
-derive newtype instance showSiblings :: Show Siblings
+derive newtype instance showChildren :: Show Children
 
-derive newtype instance encodeJsonSiblings :: EncodeJson Siblings
+derive newtype instance encodeJsonChildren :: EncodeJson Children
 
-derive newtype instance decodeJsonSiblings :: DecodeJson Siblings
+derive newtype instance decodeJsonChildren :: DecodeJson Children
 
-derive newtype instance arbitrarySiblings :: Arbitrary Siblings
+derive newtype instance arbitraryChildren :: Arbitrary Children
 
 -- FIXME dummy data
-instance defaultSiblings :: Default Siblings where
+instance defaultChildren :: Default Children where
   def =
     let
       renameEvent s v =
@@ -52,7 +52,7 @@ instance defaultSiblings :: Default Siblings where
         in
           TimeSpan x { name = s, span = v }
     in
-      Siblings
+      Children
         [ EventOrTimeSpan $ Left (renameEvent "Event A" (DecidedValueNumber 3.0))
         , EventOrTimeSpan $ Left (renameEvent "Event B" (DecidedValueNumber 3.5))
         , EventOrTimeSpan $ Right (renameTimeSpan "TimeSpan C" (DecidedSpanNumber { start: 2.0, stop: 5.0 }))
@@ -63,19 +63,19 @@ localstorageSignalKey :: String
 localstorageSignalKey = "localstorage"
 
 localstorageKey :: String
-localstorageKey = "Siblings"
+localstorageKey = "Children"
 
 -- TODO predicate from top-level index, and seek from selected time space.
-newSiblingsSignal ::
+newChildrenSignal ::
   IxSignal ( read :: S.READ ) Settings ->
-  Effect (IxSignal ( read :: S.READ, write :: S.WRITE ) Siblings)
-newSiblingsSignal settingsSignal = do
+  Effect (IxSignal ( read :: S.READ, write :: S.WRITE ) Children)
+newChildrenSignal settingsSignal = do
   store <- window >>= localStorage
   mItem <- getItem localstorageKey store
   item <- case mItem of
     Nothing -> pure def
     Just s -> case jsonParser s >>= decodeJson of
-      Left e -> throw $ "Couldn't parse Siblings: " <> e
+      Left e -> throw $ "Couldn't parse Children: " <> e
       Right x -> pure x
   sig <- make item
   let
@@ -86,12 +86,12 @@ newSiblingsSignal settingsSignal = do
   subscribeDiffLight localstorageSignalKey handler sig
   pure sig
 
-clearSiblingsCache :: Effect Unit
-clearSiblingsCache = do
+clearChildrenCache :: Effect Unit
+clearChildrenCache = do
   store <- window >>= localStorage
   removeItem localstorageKey store
 
-setDefaultSiblings ::
-  IxSignal ( write :: S.WRITE ) Siblings ->
+setDefaultChildren ::
+  IxSignal ( write :: S.WRITE ) Children ->
   Effect Unit
-setDefaultSiblings siblingsSignal = set def siblingsSignal
+setDefaultChildren childrenSignal = set def childrenSignal

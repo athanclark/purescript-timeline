@@ -1,4 +1,4 @@
-module Timeline.UI.TimeScale where
+module Timeline.UI.TimeSpace.TimeScale where
 
 import Timeline.Time.MaybeLimit
   ( DecidedMaybeLimit(DecidedMaybeLimitNumber)
@@ -83,39 +83,3 @@ instance defaultTimeScale :: Default TimeScale where
       , description: ""
       , limit: DecidedMaybeLimitNumber NothingLimit
       }
-
-localstorageSignalKey :: String
-localstorageSignalKey = "localstorage"
-
-localstorageKey :: String
-localstorageKey = "TimeScale"
-
-newTimeScaleSignal ::
-  IxSignal ( read :: S.READ ) Settings ->
-  Effect (IxSignal ( read :: S.READ, write :: S.WRITE ) TimeScale)
-newTimeScaleSignal settingsSignal = do
-  store <- window >>= localStorage
-  mItem <- getItem localstorageKey store
-  item <- case mItem of
-    Nothing -> pure def
-    Just s -> case jsonParser s >>= decodeJson of
-      Left e -> throw $ "Couldn't parse TimeScale: " <> e
-      Right x -> pure x
-  sig <- make item
-  let
-    handler x = do
-      Settings { localCacheTilExport } <- get settingsSignal
-      when localCacheTilExport
-        $ setItem localstorageKey (stringify (encodeJson x)) store
-  subscribeDiffLight localstorageSignalKey handler sig
-  pure sig
-
-clearTimeScaleCache :: Effect Unit
-clearTimeScaleCache = do
-  store <- window >>= localStorage
-  removeItem localstorageKey store
-
-setDefaultTimeScale ::
-  IxSignal ( write :: S.WRITE ) TimeScale ->
-  Effect Unit
-setDefaultTimeScale timeScaleSignal = set def timeScaleSignal

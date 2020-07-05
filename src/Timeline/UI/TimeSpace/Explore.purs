@@ -1,6 +1,6 @@
-module Timeline.UI.ExploreTimeSpaces where
+module Timeline.UI.TimeSpace.Explore where
 
-import Timeline.Time.Bounds (DecidedBounds(..))
+import Timeline.Time.MaybeLimit (DecidedMaybeLimit(..), MaybeLimit(..))
 import Prelude
 import Data.Maybe (Maybe(..))
 import Data.Tuple (Tuple(..))
@@ -19,8 +19,8 @@ import Partial.Unsafe (unsafePartial)
 -- | A rose tree of simplified recursive timespaces.
 newtype ExploreTimeSpaces
   = ExploreTimeSpaces
-  { name :: String
-  , bounds :: DecidedBounds
+  { title :: String
+  , limit :: DecidedMaybeLimit
   , id :: UUID
   , children :: Array ExploreTimeSpaces
   }
@@ -28,42 +28,43 @@ newtype ExploreTimeSpaces
 instance defaultExploreTimeSpaces :: Default ExploreTimeSpaces where
   def =
     ExploreTimeSpaces
-      { name: "TimeSpace Name"
-      , bounds:
-          DecidedBoundsNumber
-            { begin: 1234.0
-            , end: 5678.0
-            }
+      { title: "TimeSpace Name"
+      , limit:
+          DecidedMaybeLimitNumber
+            $ JustLimitBounds
+                { begin: 1234.0
+                , end: 5678.0
+                }
       , id: unsafePerformEffect UUID.genUUID
       , children:
           [ ExploreTimeSpaces
-              { name: "TimeSpace Child 1"
-              , bounds: DecidedBoundsNumber { begin: 0.0, end: 1.0 }
+              { title: "TimeSpace Child 1"
+              , limit: DecidedMaybeLimitNumber $ JustLimitBounds { begin: 0.0, end: 1.0 }
               , id: unsafePerformEffect UUID.genUUID
               , children: []
               }
           , ExploreTimeSpaces
-              { name: "TimeSpace Child 2"
-              , bounds: DecidedBoundsNumber { begin: 1.0, end: 2.0 }
+              { title: "TimeSpace Child 2"
+              , limit: DecidedMaybeLimitNumber $ JustLimitBounds { begin: 1.0, end: 2.0 }
               , id: unsafePerformEffect UUID.genUUID
               , children:
                   [ ExploreTimeSpaces
-                      { name: "TimeSpace GrandChild 1"
-                      , bounds: DecidedBoundsNumber { begin: 2.0, end: 3.0 }
+                      { title: "TimeSpace GrandChild 1"
+                      , limit: DecidedMaybeLimitNumber $ JustLimitBounds { begin: 2.0, end: 3.0 }
                       , id: unsafePerformEffect UUID.genUUID
                       , children: []
                       }
                   , ExploreTimeSpaces
-                      { name: "TimeSpace GrandChild 2"
-                      , bounds: DecidedBoundsNumber { begin: 4.0, end: 5.0 }
+                      { title: "TimeSpace GrandChild 2"
+                      , limit: DecidedMaybeLimitNumber $ JustLimitBounds { begin: 4.0, end: 5.0 }
                       , id: unsafePerformEffect UUID.genUUID
                       , children: []
                       }
                   ]
               }
           , ExploreTimeSpaces
-              { name: "TimeSpace Child 3"
-              , bounds: DecidedBoundsNumber { begin: 6.0, end: 7.0 }
+              { title: "TimeSpace Child 3"
+              , limit: DecidedMaybeLimitNumber $ JustLimitBounds { begin: 6.0, end: 7.0 }
               , id: unsafePerformEffect UUID.genUUID
               , children: []
               }
@@ -73,8 +74,8 @@ instance defaultExploreTimeSpaces :: Default ExploreTimeSpaces where
 -- | Should be treated as only used by the dialog in it's component state
 newtype ExploreTimeSpacesWithAux aux
   = ExploreTimeSpacesWithAux
-  { name :: String
-  , bounds :: DecidedBounds
+  { title :: String
+  , limit :: DecidedMaybeLimit
   , id :: UUID
   , children ::
       Maybe
@@ -88,10 +89,10 @@ newExploreTimeSpacesSignal = IxSig.make def
 
 -- | Initial state for explore time spaces
 exploreTimeSpacesWithAux :: forall aux. aux -> ExploreTimeSpaces -> ExploreTimeSpacesWithAux aux
-exploreTimeSpacesWithAux defAux (ExploreTimeSpaces { name, bounds, id, children }) =
+exploreTimeSpacesWithAux defAux (ExploreTimeSpaces { title, limit, id, children }) =
   ExploreTimeSpacesWithAux
-    { name
-    , bounds
+    { title
+    , limit
     , id
     , children:
         if Array.length children == 0 then
@@ -113,8 +114,8 @@ updateExploreTimeSpacesWithAux defAux (ExploreTimeSpacesWithAux x) (ExploreTimeS
   ExploreTimeSpacesWithAux
     x
       -- id's should be the same - no need to overwrite...?
-      { name = y.name
-      , bounds = y.bounds
+      { title = y.title
+      , limit = y.limit
       , children =
         if Array.length y.children == 0 then
           Nothing

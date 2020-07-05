@@ -1,4 +1,4 @@
-module Timeline.UI.Timelines where
+module Timeline.UI.TimeSpace.Timelines where
 
 import Timeline.UI.Timeline (Timeline(..))
 import Timeline.UI.Settings (Settings(..))
