@@ -1,22 +1,19 @@
 module Timeline.UI.Timeline where
 
 import Timeline.UI.EventOrTimeSpan (EventOrTimeSpanPoly(..))
+import Timeline.ID.Timeline (TimelineID(..))
+import Timeline.ID.Event (EventID(..))
+import Timeline.ID.TimeSpan (TimeSpanID(..))
 import Prelude
-import Data.Maybe (Maybe(..))
 import Data.Either (Either(..))
-import Data.NonEmpty (NonEmpty(..))
 import Data.Generic.Rep (class Generic)
-import Data.Argonaut (class EncodeJson, class DecodeJson, (:=), (~>), jsonEmptyObject, (.:), decodeJson, fail)
+import Data.Argonaut (class EncodeJson, class DecodeJson, (:=), (~>), jsonEmptyObject, (.:), decodeJson)
 import Data.Default (class Default)
-import Data.Bifunctor (bimap)
-import Data.UUID (UUID)
-import Data.UUID (toString, parseUUID, genUUID) as UUID
-import Data.Traversable (traverse)
+import Data.UUID (genUUID) as UUID
 import Data.Unfoldable (replicateA)
 import Effect.Unsafe (unsafePerformEffect)
 import Effect.Random (randomInt)
-import Test.QuickCheck (class Arbitrary)
-import Test.QuickCheck.Gen (arrayOf, oneOf)
+import Test.QuickCheck (class Arbitrary, arbitrary)
 import Test.QuickCheck.UTF8String (genString)
 import Partial.Unsafe (unsafePartial)
 
@@ -25,8 +22,8 @@ newtype Timeline
   { name :: String
   , description :: String
   -- TODO color
-  , children :: Array (EventOrTimeSpanPoly UUID UUID)
-  , id :: UUID
+  , children :: Array (EventOrTimeSpanPoly EventID TimeSpanID)
+  , id :: TimelineID
   }
 
 derive instance genericTimeline :: Generic Timeline _
@@ -41,9 +38,9 @@ instance encodeJsonTimeline :: EncodeJson Timeline where
       ~> "description"
       := description
       ~> "children"
-      := map (bimap UUID.toString UUID.toString) children
+      := children
       ~> "id"
-      := UUID.toString id
+      := id
       ~> jsonEmptyObject
 
 instance decodeJsonTimeline :: DecodeJson Timeline where
@@ -51,32 +48,16 @@ instance decodeJsonTimeline :: DecodeJson Timeline where
     o <- decodeJson json
     name <- o .: "name"
     description <- o .: "description"
-    let
-      getUUID s = case UUID.parseUUID s of
-        Nothing -> fail $ "Couldn't parse UUID: " <> s
-        Just x -> pure x
-
-      getUUIDs (EventOrTimeSpanPoly eX) =
-        EventOrTimeSpanPoly
-          <$> case eX of
-              Left s -> Left <$> getUUID s
-              Right s -> Right <$> getUUID s
-    children <- o .: "children" >>= traverse getUUIDs
-    id <- o .: "id" >>= getUUID
+    children <- o .: "children"
+    id <- o .: "id"
     pure (Timeline { name, description, children, id })
 
 instance arbitraryTimeline :: Arbitrary Timeline where
   arbitrary = do
     name <- genString
     description <- genString
-    let
-      genUUID = do
-        pure (unsafePerformEffect UUID.genUUID)
-    children <-
-      arrayOf
-        $ EventOrTimeSpanPoly
-        <$> oneOf (NonEmpty (Left <$> genUUID) [ Right <$> genUUID ])
-    id <- genUUID
+    children <- arbitrary
+    id <- arbitrary
     pure (Timeline { name, description, children, id })
 
 -- -- | The key in the IxSignal that listens to changes
@@ -96,12 +77,12 @@ instance defaultTimleine :: Default Timeline where
             lOrR <- randomInt 1 2
             unsafePartial $ map EventOrTimeSpanPoly
               $ case lOrR of
-                  1 -> Left <$> UUID.genUUID
-                  2 -> Right <$> UUID.genUUID
+                  1 -> Left <<< EventID <$> UUID.genUUID
+                  2 -> Right <<< TimeSpanID <$> UUID.genUUID
     in
       Timeline
         { name: "Timeline"
         , description: ""
         , children
-        , id: unsafePerformEffect UUID.genUUID
+        , id: TimelineID (unsafePerformEffect UUID.genUUID)
         }

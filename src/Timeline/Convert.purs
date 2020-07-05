@@ -36,6 +36,9 @@ import Timeline.Data
   )
   as Data
 import Timeline.ID.TimeSpace (TimeSpaceID)
+import Timeline.ID.Timeline (TimelineID)
+import Timeline.ID.Event (EventID)
+import Timeline.ID.TimeSpan (TimeSpanID)
 import Timeline.Time.Unit (DecidedUnit(..))
 import Timeline.Time.Value (DecidedValue(..))
 import Timeline.Time.Span (makeDecidedSpan, unmakeDecidedSpan)
@@ -45,7 +48,6 @@ import Data.Either (Either(..), note)
 import Data.Tuple (Tuple(..))
 import Data.Array (snoc, foldM, mapMaybe, concatMap) as Array
 import Data.Traversable (traverse)
-import Data.UUID (UUID)
 import Partial.Unsafe (unsafePartial) -- FIXME
 
 -- | Translates a recursive `TimeSpaceDecided` into a flat `UISets`.
@@ -100,18 +102,18 @@ populateTimeSpace decidedUnit ( Data.TimeSpace
   where
   -- folds through the timelines, gathering ids as they're added to the sets
   populateTimelines ::
-    Tuple (Array UUID) UISets ->
+    Tuple (Array TimelineID) UISets ->
     Data.Timeline DecidedValue ->
-    Either PopulateError (Tuple (Array UUID) UISets)
+    Either PopulateError (Tuple (Array TimelineID) UISets)
   populateTimelines (Tuple ids sets') timeline@(Data.Timeline { id: id' }) = do
     sets'' <- populateTimeline timeline sets'
     pure (Tuple (Array.snoc ids id') sets'')
 
   -- folds through the siblings, gathering ids as they're added to the sets
   populateSiblings ::
-    Tuple (Array (UI.EventOrTimeSpanPoly UUID UUID)) UISets ->
+    Tuple (Array (UI.EventOrTimeSpanPoly EventID TimeSpanID)) UISets ->
     Data.EventOrTimeSpan DecidedValue ->
-    Either PopulateError (Tuple (Array (UI.EventOrTimeSpanPoly UUID UUID)) UISets)
+    Either PopulateError (Tuple (Array (UI.EventOrTimeSpanPoly EventID TimeSpanID)) UISets)
   populateSiblings (Tuple siblingIds sets'') (Data.EventOrTimeSpan x) = case x of
     Left e@(Data.Event { id: id' }) -> do
       -- directly convert the leaf node, event
@@ -144,9 +146,9 @@ populateTimeline (Data.Timeline { children, name, description, id }) sets = do
   where
   -- folds through the children, gathering ids as they're added to the sets
   populateChildren ::
-    Tuple (Array (UI.EventOrTimeSpanPoly UUID UUID)) UISets ->
+    Tuple (Array (UI.EventOrTimeSpanPoly EventID TimeSpanID)) UISets ->
     Data.EventOrTimeSpan DecidedValue ->
-    Either PopulateError (Tuple (Array (UI.EventOrTimeSpanPoly UUID UUID)) UISets)
+    Either PopulateError (Tuple (Array (UI.EventOrTimeSpanPoly EventID TimeSpanID)) UISets)
   populateChildren (Tuple childrenIds sets'') (Data.EventOrTimeSpan x) = case x of
     Left e@(Data.Event { id: id' }) -> do
       -- directly convert the leaf node, event
@@ -264,7 +266,7 @@ synthesizeTimeSpace id sets = do
         , siblings: siblings'
         }
 
-synthesizeTimeline :: UUID -> UISets -> Either SynthesizeError (Data.Timeline DecidedValue)
+synthesizeTimeline :: TimelineID -> UISets -> Either SynthesizeError (Data.Timeline DecidedValue)
 synthesizeTimeline id sets = do
   UI.Timeline
     { name
@@ -282,7 +284,7 @@ synthesizeTimeline id sets = do
         , children: children'
         }
 
-synthesizeSiblingEventOrTimeSpan :: UI.EventOrTimeSpanPoly UUID UUID -> UISets -> Either SynthesizeError (Data.EventOrTimeSpan DecidedValue)
+synthesizeSiblingEventOrTimeSpan :: UI.EventOrTimeSpanPoly EventID TimeSpanID -> UISets -> Either SynthesizeError (Data.EventOrTimeSpan DecidedValue)
 synthesizeSiblingEventOrTimeSpan (UI.EventOrTimeSpanPoly eOrTs) sets = case eOrTs of
   Left eId ->
     Data.EventOrTimeSpan
@@ -310,7 +312,7 @@ synthesizeSiblingEventOrTimeSpan (UI.EventOrTimeSpanPoly eOrTs) sets = case eOrT
           , id
           }
 
-synthesizeChildEventOrTimeSpan :: UI.EventOrTimeSpanPoly UUID UUID -> UISets -> Either SynthesizeError (Data.EventOrTimeSpan DecidedValue)
+synthesizeChildEventOrTimeSpan :: UI.EventOrTimeSpanPoly EventID TimeSpanID -> UISets -> Either SynthesizeError (Data.EventOrTimeSpan DecidedValue)
 synthesizeChildEventOrTimeSpan (UI.EventOrTimeSpanPoly eOrTs) sets = case eOrTs of
   Left eId ->
     Data.EventOrTimeSpan
@@ -355,7 +357,7 @@ synthesizeExploreTimeSpaces sets@(UISets { root }) = case root of
     } <-
       getTimeSpace timeSpaceId sets
     let
-      getSpans :: Array (UI.EventOrTimeSpanPoly UUID UUID) -> Array UUID
+      getSpans :: Array (UI.EventOrTimeSpanPoly EventID TimeSpanID) -> Array TimeSpanID
       getSpans = Array.mapMaybe getSpan
         where
         getSpan (UI.EventOrTimeSpanPoly eOrTs) = case eOrTs of

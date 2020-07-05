@@ -21,6 +21,8 @@ import Timeline.Time.Span
 import Timeline.Data.Event (Event(..))
 import Timeline.Data.TimeScale (TimeScale(..))
 import Timeline.ID.TimeSpace (TimeSpaceID)
+import Timeline.ID.Timeline (TimelineID)
+import Timeline.ID.TimeSpan (TimeSpanID)
 import Prelude
 import Data.Maybe (Maybe(..))
 import Data.Either (Either(..))
@@ -38,14 +40,9 @@ import Data.Tuple.Nested
   )
 import Data.Foldable (class Foldable, foldr, foldl, foldMap)
 import Data.Traversable (class Traversable, traverse, sequence)
-import Data.Vec (Vec)
-import Data.Typelevel.Num (D16)
-import Data.UUID (UUID)
-import Data.UUID (toString, parseUUID, genUUID, toBytes, parseBytesUUID) as UUID
-import Data.UInt (fromInt, toInt) as UInt
 import Data.NonEmpty (NonEmpty(..))
 import Data.Generic.Rep (class Generic)
-import Data.Argonaut (class EncodeJson, class DecodeJson, decodeJson, (.:), (:=), (~>), jsonEmptyObject, fail)
+import Data.Argonaut (class EncodeJson, class DecodeJson, decodeJson, (.:), (:=), (~>), jsonEmptyObject)
 import Data.ArrayBuffer.Class
   ( class EncodeArrayBuffer
   , class DecodeArrayBuffer
@@ -54,11 +51,8 @@ import Data.ArrayBuffer.Class
   , readArrayBuffer
   , byteLength
   )
-import Data.ArrayBuffer.Class.Types (Uint8(..), Int8(..), Float64BE(..))
+import Data.ArrayBuffer.Class.Types (Int8(..), Float64BE(..))
 import Control.Alternative ((<|>))
-import Effect (Effect)
-import Effect.Unsafe (unsafePerformEffect)
-import Effect.Exception (throw)
 import Test.QuickCheck (class Arbitrary, arbitrary)
 import Test.QuickCheck.Gen (oneOf, sized, resize)
 import Test.QuickCheck.UTF8String (genString)
@@ -72,7 +66,6 @@ newtype TimeSpace index
   { timeScale :: TimeScale index
   , timelines :: Array (Timeline index)
   , siblings :: Array (EventOrTimeSpan index)
-  -- FIXME add cross-referenced timeline children? Ones that _reference_ multiple timelines, rather than belong to them
   -- non-essential
   , title :: String
   , description :: String
@@ -304,13 +297,6 @@ instance eqEventOrTimeSpanData :: Eq index => Eq (EventOrTimeSpan index) where
     Tuple (Right x') (Right y') -> x' == y'
     _ -> false
 
--- FIXME special kind of comparison between types? Would it break pre-order?
--- instance ordEventOrTimeSpanData :: Ord index => Ord (EventOrTimeSpan index) where
---   compare (EventOrTimeSpan x) (EventOrTimeSpan y) = case Tuple x y of
---     Tuple (Left x') (Left y') -> compare x' y'
---     Tuple (Right x') (Right y') -> compare x' y'
---     Tuple (Left _) (Right _) -> LT
---     Tuple (Right _) (Left _) -> GT
 instance showEventOrTimeSpanData :: Show index => Show (EventOrTimeSpan index) where
   show (EventOrTimeSpan x) =
     let
@@ -376,7 +362,7 @@ newtype Timeline index
   , name :: String
   , description :: String
   -- TODO color
-  , id :: UUID
+  , id :: TimelineID
   }
 
 derive instance genericTimeline :: Generic (Timeline index) _
@@ -426,7 +412,7 @@ instance encodeJsonTimeline :: EncodeJson index => EncodeJson (Timeline index) w
       ~> "description"
       := description
       ~> "id"
-      := UUID.toString id
+      := id
       ~> jsonEmptyObject
 
 instance decodeJsonTimeline :: (DecodeJson index, Ord index) => DecodeJson (Timeline index) where
@@ -435,29 +421,23 @@ instance decodeJsonTimeline :: (DecodeJson index, Ord index) => DecodeJson (Time
     children <- o .: "children"
     name <- o .: "name"
     description <- o .: "description"
-    id' <- o .: "id"
-    case UUID.parseUUID id' of
-      Nothing -> fail $ "Couldn't parse UUID: " <> id'
-      Just id -> pure (Timeline { children, name, description, id })
+    id <- o .: "id"
+    pure (Timeline { children, name, description, id })
 
 instance encodeArrayBufferTimeline :: EncodeArrayBuffer index => EncodeArrayBuffer (Timeline index) where
-  putArrayBuffer b o (Timeline { children, name, description, id }) = putArrayBuffer b o (tuple4 children name description (toBytesUUID id))
+  putArrayBuffer b o (Timeline { children, name, description, id }) = putArrayBuffer b o (tuple4 children name description id)
 
 instance decodeArrayBufferTimeline :: (DecodeArrayBuffer index, DynamicByteLength index, Ord index) => DecodeArrayBuffer (Timeline index) where
   readArrayBuffer b o = do
     let
-      go :: _ /\ _ /\ _ /\ _ /\ Unit -> Effect (Maybe (Timeline index))
+      go :: _ /\ _ /\ _ /\ _ /\ Unit -> Timeline index
       go =
-        uncurry4 \children name description id' -> case parseBytesUUID id' of
-          Nothing -> throw $ "Couldn't parse UUID: " <> show id'
-          Just id -> pure $ Just $ Timeline { children, name, description, id }
-    mXs <- readArrayBuffer b o
-    case mXs of
-      Nothing -> pure Nothing
-      Just xs -> go xs
+        uncurry4 \children name description id ->
+          Timeline { children, name, description, id }
+    map go <$> readArrayBuffer b o
 
 instance dynamicByteLengthTimeline :: DynamicByteLength index => DynamicByteLength (Timeline index) where
-  byteLength (Timeline { children, name, description, id }) = byteLength (tuple4 children name description (toBytesUUID id))
+  byteLength (Timeline { children, name, description, id }) = byteLength (tuple4 children name description id)
 
 instance arbitraryTimeline :: (Arbitrary index, Ord index) => Arbitrary (Timeline index) where
   arbitrary = do
@@ -466,8 +446,7 @@ instance arbitraryTimeline :: (Arbitrary index, Ord index) => Arbitrary (Timelin
         resize (size `div` 2) arbitrary
     name <- genString
     description <- genString
-    let
-      id = unsafePerformEffect UUID.genUUID
+    id <- arbitrary
     pure (Timeline { children, name, description, id })
 
 -- ------------------ TimeSpan
@@ -479,7 +458,7 @@ newtype TimeSpan index
   , name :: String
   , description :: String
   -- TODO color
-  , id :: UUID
+  , id :: TimeSpanID
   , span :: Span index
   }
 
@@ -536,7 +515,7 @@ instance encodeJsonTimeSpan :: EncodeJson index => EncodeJson (TimeSpan index) w
       ~> "description"
       := description
       ~> "id"
-      := UUID.toString id
+      := id
       ~> "span"
       := encodeJsonSpan (Proxy :: Proxy index) span
       ~> jsonEmptyObject
@@ -547,15 +526,13 @@ instance decodeJsonTimeSpan :: DecodeJson index => DecodeJson (TimeSpan index) w
     timeSpace <- o .: "timeSpace"
     name <- o .: "name"
     description <- o .: "description"
-    id' <- o .: "id"
+    id <- o .: "id"
     span <- o .: "span" >>= decodeJsonSpan (Proxy :: Proxy index)
-    case UUID.parseUUID id' of
-      Nothing -> fail $ "Couldn't parse UUID: " <> id'
-      Just id -> pure $ TimeSpan { timeSpace, name, description, id, span }
+    pure $ TimeSpan { timeSpace, name, description, id, span }
 
 instance encodeArrayBufferTimeSpan :: EncodeArrayBuffer index => EncodeArrayBuffer (TimeSpan index) where
   putArrayBuffer b o (TimeSpan { timeSpace, name, description, id, span }) = do
-    mW <- putArrayBuffer b o (tuple4 timeSpace name description (toBytesUUID id))
+    mW <- putArrayBuffer b o (tuple4 timeSpace name description id)
     case mW of
       Nothing -> pure Nothing
       Just w -> do
@@ -572,24 +549,23 @@ instance decodeArrayBufferTimeSpan :: (DecodeArrayBuffer index, DynamicByteLengt
       Just (xs :: _ /\ _ /\ _ /\ _ /\ Unit) -> do
         l <- byteLength xs
         mSpan <- readArrayBufferSpan (Proxy :: Proxy index) b (o + l)
-        case mSpan of
-          Nothing -> pure Nothing
-          Just span -> case parseBytesUUID (get4 xs) of
-            Nothing -> throw $ "Couldn't parse UUID: " <> show (get4 xs)
-            Just id ->
-              pure $ Just
-                $ TimeSpan
-                    { timeSpace: get1 xs
-                    , name: get2 xs
-                    , description: get3 xs
-                    , id
-                    , span
-                    }
+        pure
+          $ case mSpan of
+              Nothing -> Nothing
+              Just span ->
+                Just
+                  $ TimeSpan
+                      { timeSpace: get1 xs
+                      , name: get2 xs
+                      , description: get3 xs
+                      , id: get4 xs
+                      , span
+                      }
 
 instance dynamicByteLengthTimeSpan :: DynamicByteLength index => DynamicByteLength (TimeSpan index) where
   byteLength (TimeSpan { timeSpace, name, description, id, span }) = do
     l <- byteLengthSpan (Proxy :: Proxy index) span
-    l' <- byteLength (tuple4 timeSpace name description (toBytesUUID id))
+    l' <- byteLength (tuple4 timeSpace name description id)
     pure (l + l')
 
 instance arbitraryTimeSpan :: Arbitrary index => Arbitrary (TimeSpan index) where
@@ -601,14 +577,6 @@ instance arbitraryTimeSpan :: Arbitrary index => Arbitrary (TimeSpan index) wher
         oneOf (NonEmpty (pure Nothing) [ Just <$> subtree ])
     name <- genString
     description <- genString
-    let
-      id = unsafePerformEffect UUID.genUUID
+    id <- arbitrary
     span <- genSpan (Proxy :: Proxy index)
     pure (TimeSpan { timeSpace, name, description, id, span })
-
--- Utilities
-parseBytesUUID :: Vec D16 Uint8 -> Maybe UUID
-parseBytesUUID = UUID.parseBytesUUID <<< map (\(Uint8 x) -> UInt.toInt x)
-
-toBytesUUID :: UUID -> Vec D16 Uint8
-toBytesUUID = map (Uint8 <<< UInt.fromInt) <<< UUID.toBytes

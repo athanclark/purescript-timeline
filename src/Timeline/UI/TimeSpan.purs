@@ -1,11 +1,11 @@
 module Timeline.UI.TimeSpan where
 
 import Timeline.ID.TimeSpace (TimeSpaceID)
+import Timeline.ID.TimeSpan (TimeSpanID(..))
 import Timeline.Time.Span (DecidedSpan(..))
 import Prelude
 import Data.Maybe (Maybe(..))
-import Data.UUID (UUID)
-import Data.UUID (toString, parseUUID, genUUID) as UUID
+import Data.UUID (genUUID) as UUID
 import Data.Generic.Rep (class Generic)
 import Data.Default (class Default)
 import Data.Argonaut
@@ -16,7 +16,6 @@ import Data.Argonaut
   , (~>)
   , jsonEmptyObject
   , (.:)
-  , fail
   )
 import Effect.Unsafe (unsafePerformEffect)
 import Test.QuickCheck (class Arbitrary, arbitrary)
@@ -31,7 +30,7 @@ newtype TimeSpan
   , description :: String
   , span :: DecidedSpan
   , timeSpace :: Maybe TimeSpaceID
-  , id :: UUID -- TODO trim the fat later
+  , id :: TimeSpanID -- TODO trim the fat later
   }
 
 derive instance genericTimeSpan :: Generic TimeSpan _
@@ -50,7 +49,7 @@ instance encodeJsonTimeSpan :: EncodeJson TimeSpan where
       ~> "timeSpace"
       := timeSpace
       ~> "id"
-      := UUID.toString id
+      := id
       ~> jsonEmptyObject
 
 instance decodeJsonTimeSpan :: DecodeJson TimeSpan where
@@ -59,12 +58,8 @@ instance decodeJsonTimeSpan :: DecodeJson TimeSpan where
     name <- o .: "name"
     description <- o .: "description"
     span <- o .: "span"
-    let
-      getUUID s = case UUID.parseUUID s of
-        Nothing -> fail $ "Couldn't parse UUID: " <> s
-        Just x -> pure x
     timeSpace <- o .: "timeSpace"
-    id <- o .: "id" >>= getUUID
+    id <- o .: "id"
     pure $ TimeSpan { name, description, span, timeSpace, id }
 
 instance arbitraryTimeSpan :: Arbitrary TimeSpan where
@@ -73,8 +68,7 @@ instance arbitraryTimeSpan :: Arbitrary TimeSpan where
     description <- genString
     span <- arbitrary
     timeSpace <- arbitrary
-    let
-      id = unsafePerformEffect UUID.genUUID
+    id <- arbitrary
     pure (TimeSpan { name, description, span, timeSpace, id })
 
 instance defaultTimeSpan :: Default TimeSpan where
@@ -84,5 +78,5 @@ instance defaultTimeSpan :: Default TimeSpan where
       , description: ""
       , span: DecidedSpanNumber { start: 0.0, stop: 1.0 }
       , timeSpace: Nothing
-      , id: unsafePerformEffect UUID.genUUID
+      , id: TimeSpanID (unsafePerformEffect UUID.genUUID)
       }

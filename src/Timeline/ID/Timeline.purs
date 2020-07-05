@@ -1,4 +1,4 @@
-module Timeline.ID.TimeSpace where
+module Timeline.ID.Timeline where
 
 import Prelude
 import Data.Maybe (Maybe(..))
@@ -28,30 +28,30 @@ import Effect.Exception (throw)
 import Test.QuickCheck (class Arbitrary, arbitrary)
 import Partial.Unsafe (unsafePartial)
 
-newtype TimeSpaceID
-  = TimeSpaceID UUID
+newtype TimelineID
+  = TimelineID UUID
 
-derive instance genericTimeSpaceID :: Generic TimeSpaceID _
+derive instance genericTimelineID :: Generic TimelineID _
 
-derive newtype instance eqTimeSpaceID :: Eq TimeSpaceID
+derive newtype instance eqTimelineID :: Eq TimelineID
 
-instance showTimeSpaceID :: Show TimeSpaceID where
-  show (TimeSpaceID x) = UUID.toString x
+instance showTimelineID :: Show TimelineID where
+  show (TimelineID x) = UUID.toString x
 
-instance encodeJsonTimeSpaceID :: EncodeJson TimeSpaceID where
+instance encodeJsonTimelineID :: EncodeJson TimelineID where
   encodeJson x = encodeJson (show x)
 
-instance decodeJsonTimeSpaceID :: DecodeJson TimeSpaceID where
+instance decodeJsonTimelineID :: DecodeJson TimelineID where
   decodeJson json = do
     s <- decodeJson json
     case UUID.parseUUID s of
-      Nothing -> fail $ "Can't parse TimeSpaceID: " <> show s
-      Just x -> pure (TimeSpaceID x)
+      Nothing -> fail $ "Can't parse TimelineID: " <> show s
+      Just x -> pure (TimelineID x)
 
-instance encodeArrayBufferTimeSpaceID :: EncodeArrayBuffer TimeSpaceID where
-  putArrayBuffer b o (TimeSpaceID x) = putArrayBuffer b o (map (Uint8 <<< UInt.fromInt) (UUID.toBytes x))
+instance encodeArrayBufferTimelineID :: EncodeArrayBuffer TimelineID where
+  putArrayBuffer b o (TimelineID x) = putArrayBuffer b o (map (Uint8 <<< UInt.fromInt) (UUID.toBytes x))
 
-instance decodeArrayBufferTimeSpaceID :: DecodeArrayBuffer TimeSpaceID where
+instance decodeArrayBufferTimelineID :: DecodeArrayBuffer TimelineID where
   readArrayBuffer b o = do
     (mXs :: Maybe (Vec D16 Uint8)) <- readArrayBuffer b o
     case mXs of
@@ -61,15 +61,15 @@ instance decodeArrayBufferTimeSpaceID :: DecodeArrayBuffer TimeSpaceID where
           xs :: Vec D16 Int
           xs = map (\(Uint8 x) -> UInt.toInt x) xs'
         case UUID.parseBytesUUID xs of
-          Nothing -> throw $ "Can't parse TimeSpaceID: " <> show xs
-          Just y -> pure (Just (TimeSpaceID y))
+          Nothing -> throw $ "Can't parse TimelineID: " <> show xs
+          Just y -> pure (Just (TimelineID y))
 
-instance dynamicByteLengthTimeSpaceID :: DynamicByteLength TimeSpaceID where
-  byteLength (TimeSpaceID x) = byteLength (map (Uint8 <<< UInt.fromInt) (UUID.toBytes x))
+instance dynamicByteLengthTimelineID :: DynamicByteLength TimelineID where
+  byteLength (TimelineID x) = byteLength (map (Uint8 <<< UInt.fromInt) (UUID.toBytes x))
 
-instance arbitraryTimeSpaceID :: Arbitrary TimeSpaceID where
+instance arbitraryTimelineID :: Arbitrary TimelineID where
   arbitrary = do
     (xs :: Vec D16 Int) <- map (_ `mod` 256) <$> arbitrary
     unsafePartial
       $ case UUID.parseBytesUUID xs of
-          Just x -> pure (TimeSpaceID x)
+          Just x -> pure (TimelineID x)

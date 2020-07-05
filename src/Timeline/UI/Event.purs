@@ -1,8 +1,8 @@
 module Timeline.UI.Event where
 
 import Timeline.Time.Value (DecidedValue(..))
+import Timeline.ID.Event (EventID(..))
 import Prelude
-import Data.Maybe (Maybe(..))
 import Data.Generic.Rep (class Generic)
 import Data.Argonaut
   ( class EncodeJson
@@ -12,10 +12,8 @@ import Data.Argonaut
   , (~>)
   , jsonEmptyObject
   , (.:)
-  , fail
   )
-import Data.UUID (UUID)
-import Data.UUID (toString, parseUUID, genUUID) as UUID
+import Data.UUID (genUUID) as UUID
 import Data.Default (class Default)
 import Effect.Unsafe (unsafePerformEffect)
 import Test.QuickCheck (class Arbitrary, arbitrary)
@@ -28,7 +26,7 @@ newtype Event
   = Event
   { name :: String
   , description :: String
-  , id :: UUID
+  , id :: EventID
   , time :: DecidedValue
   }
 
@@ -44,7 +42,7 @@ instance encodeJsonEvent :: EncodeJson Event where
       ~> "description"
       := description
       ~> "id"
-      := UUID.toString id
+      := id
       ~> "time"
       := time
       ~> jsonEmptyObject
@@ -54,18 +52,15 @@ instance decodeJsonEvent :: DecodeJson Event where
     o <- decodeJson json
     name <- o .: "name"
     description <- o .: "description"
-    id' <- o .: "id"
+    id <- o .: "id"
     time <- o .: "time"
-    case UUID.parseUUID id' of
-      Nothing -> fail $ "Couldn't parse UUID: " <> id'
-      Just id -> pure (Event { name, description, id, time })
+    pure (Event { name, description, id, time })
 
 instance arbitraryEvent :: Arbitrary Event where
   arbitrary = do
     name <- genString
     description <- genString
-    let
-      id = unsafePerformEffect UUID.genUUID
+    id <- arbitrary
     time <- arbitrary
     pure (Event { name, description, id, time })
 
@@ -74,6 +69,6 @@ instance defaultEvent :: Default Event where
     Event
       { name: "Event"
       , description: ""
-      , id: unsafePerformEffect UUID.genUUID
+      , id: EventID (unsafePerformEffect UUID.genUUID)
       , time: DecidedValueNumber 0.0
       }

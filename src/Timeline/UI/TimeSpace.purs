@@ -1,18 +1,17 @@
 module Timeline.UI.TimeSpace where
 
 import Timeline.UI.TimeSpace.TimeScale (TimeScale)
-import Timeline.UI.EventOrTimeSpan (EventOrTimeSpanPoly(..))
+import Timeline.UI.EventOrTimeSpan (EventOrTimeSpanPoly)
 import Timeline.UI.Settings (Settings(..))
 import Timeline.ID.TimeSpace (TimeSpaceID(..))
+import Timeline.ID.Timeline (TimelineID)
+import Timeline.ID.Event (EventID)
+import Timeline.ID.TimeSpan (TimeSpanID)
 import Prelude
 import Data.Maybe (Maybe(..))
 import Data.Either (Either(..))
-import Data.NonEmpty (NonEmpty(..))
-import Data.Bifunctor (bimap)
-import Data.Traversable (traverse)
 import Data.Default (class Default, def)
-import Data.UUID (UUID)
-import Data.UUID (toString, parseUUID, genUUID) as UUID
+import Data.UUID (genUUID) as UUID
 import Data.Generic.Rep (class Generic)
 import Data.Argonaut
   ( class EncodeJson
@@ -23,7 +22,6 @@ import Data.Argonaut
   , (~>)
   , jsonEmptyObject
   , (.:)
-  , fail
   , jsonParser
   , stringify
   )
@@ -36,7 +34,6 @@ import Web.Storage.Storage (setItem, getItem, removeItem)
 import Zeta.Types (READ, WRITE) as S
 import IxZeta (IxSignal, set, get, make, subscribeDiffLight)
 import Test.QuickCheck (class Arbitrary, arbitrary)
-import Test.QuickCheck.Gen (arrayOf, oneOf)
 import Test.QuickCheck.UTF8String (genString)
 
 newtype TimeSpace
@@ -44,8 +41,8 @@ newtype TimeSpace
   { title :: String
   , description :: String
   , timeScale :: TimeScale
-  , siblings :: Array (EventOrTimeSpanPoly UUID UUID) -- TODO manual field sorting
-  , timelines :: Array UUID
+  , siblings :: Array (EventOrTimeSpanPoly EventID TimeSpanID) -- TODO manual field sorting
+  , timelines :: Array TimelineID
   , id :: TimeSpaceID
   }
 
@@ -63,9 +60,9 @@ instance encodeJsonTimeSpace :: EncodeJson TimeSpace where
       ~> "timeScale"
       := timeScale
       ~> "siblings"
-      := map (bimap UUID.toString UUID.toString) siblings
+      := siblings
       ~> "timelines"
-      := map UUID.toString timelines
+      := timelines
       ~> "id"
       := id
       ~> jsonEmptyObject
@@ -75,17 +72,9 @@ instance decodeJsonTimeSpace :: DecodeJson TimeSpace where
     o <- decodeJson json
     title <- o .: "title"
     description <- o .: "description"
-    let
-      getUUID s = case UUID.parseUUID s of
-        Nothing -> fail $ "Couldn't parse UUID: " <> s
-        Just x -> pure x
-
-      getIds (EventOrTimeSpanPoly eOrTs) = case eOrTs of
-        Left s -> EventOrTimeSpanPoly <<< Left <$> getUUID s
-        Right s -> EventOrTimeSpanPoly <<< Right <$> getUUID s
     timeScale <- o .: "timeScale"
-    siblings <- o .: "siblings" >>= traverse getIds
-    timelines <- o .: "timelines" >>= traverse getUUID
+    siblings <- o .: "siblings"
+    timelines <- o .: "timelines"
     id <- o .: "id"
     pure (TimeSpace { title, description, timeScale, siblings, timelines, id })
 
@@ -94,10 +83,8 @@ instance arbitraryEvent :: Arbitrary TimeSpace where
     title <- genString
     description <- genString
     timeScale <- arbitrary
-    let
-      genId = pure (unsafePerformEffect UUID.genUUID)
-    siblings <- arrayOf $ EventOrTimeSpanPoly <$> oneOf (NonEmpty (Left <$> genId) [ Right <$> genId ])
-    timelines <- arrayOf genId
+    siblings <- arbitrary
+    timelines <- arbitrary
     id <- arbitrary
     pure (TimeSpace { title, description, timeScale, siblings, timelines, id })
 

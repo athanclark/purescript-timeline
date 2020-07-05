@@ -1,13 +1,12 @@
 module Timeline.Data.Event where
 
+import Timeline.ID.Event (EventID)
 import Prelude
-import Data.Maybe (Maybe(..))
 import Data.Foldable (class Foldable)
 import Data.Traversable (class Traversable)
-import Data.UInt (fromInt, toInt) as UInt
 import Data.Tuple.Nested (type (/\), tuple4, uncurry4)
 import Data.Generic.Rep (class Generic)
-import Data.Argonaut (class EncodeJson, class DecodeJson, (:=), (~>), jsonEmptyObject, (.:), decodeJson, fail)
+import Data.Argonaut (class EncodeJson, class DecodeJson, (:=), (~>), jsonEmptyObject, (.:), decodeJson)
 import Data.ArrayBuffer.Class
   ( class EncodeArrayBuffer
   , class DecodeArrayBuffer
@@ -16,12 +15,6 @@ import Data.ArrayBuffer.Class
   , readArrayBuffer
   , byteLength
   )
-import Data.ArrayBuffer.Class.Types (Uint8(..))
-import Data.UUID (UUID)
-import Data.UUID (toBytes, toString, parseUUID, parseBytesUUID, genUUID) as UUID
-import Effect (Effect)
-import Effect.Exception (throw)
-import Effect.Unsafe (unsafePerformEffect)
 import Test.QuickCheck (class Arbitrary, arbitrary)
 import Test.QuickCheck.UTF8String (genString)
 
@@ -31,15 +24,13 @@ newtype Event index
   { name :: String
   , description :: String
   -- TODO color
-  , id :: UUID
+  , id :: EventID
   , time :: index
   }
 
 derive instance genericEvent :: Generic index index' => Generic (Event index) _
 
 derive newtype instance eqEvent :: Eq index => Eq (Event index)
-
-derive newtype instance ordEvent :: Ord index => Ord (Event index) -- FIXME sort by time field first?
 
 derive newtype instance showEvent :: Show index => Show (Event index)
 
@@ -61,7 +52,7 @@ instance encodeJsonEvent :: EncodeJson index => EncodeJson (Event index) where
       ~> "description"
       := description
       ~> "id"
-      := UUID.toString id
+      := id
       ~> "time"
       := time
       ~> jsonEmptyObject
@@ -71,42 +62,29 @@ instance decodeJsonEvent :: DecodeJson index => DecodeJson (Event index) where
     o <- decodeJson json
     name <- o .: "name"
     description <- o .: "description"
-    id' <- o .: "id"
+    id <- o .: "id"
     time <- o .: "time"
-    case UUID.parseUUID id' of
-      Nothing -> fail $ "Couldn't parse UUID: " <> id'
-      Just id -> pure $ Event { name, description, id, time }
+    pure $ Event { name, description, id, time }
 
 instance encodeArrayBufferEvent :: EncodeArrayBuffer index => EncodeArrayBuffer (Event index) where
-  putArrayBuffer b o (Event { name, description, id, time }) = putArrayBuffer b o (tuple4 name description fixedBytesId time)
-    where
-    fixedBytesId = map (Uint8 <<< UInt.fromInt) (UUID.toBytes id)
+  putArrayBuffer b o (Event { name, description, id, time }) = putArrayBuffer b o (tuple4 name description id time)
 
 instance decodeArrayBufferEvent :: (DecodeArrayBuffer index, DynamicByteLength index) => DecodeArrayBuffer (Event index) where
   readArrayBuffer b o = do
     let
-      go :: _ /\ _ /\ _ /\ _ /\ Unit -> Effect (Maybe (Event index))
+      go :: _ /\ _ /\ _ /\ _ /\ Unit -> Event index
       go =
-        uncurry4 \name description id' time -> case UUID.parseBytesUUID (getBytes id') of
-          Nothing -> throw $ "Couldn't parse UUID: " <> show id'
-          Just id -> pure $ Just $ Event { name, description, id, time }
-    mXs <- readArrayBuffer b o
-    case mXs of
-      Nothing -> pure Nothing
-      Just xs -> go xs
-    where
-    getBytes = map (\(Uint8 x) -> UInt.toInt x)
+        uncurry4 \name description id time ->
+          Event { name, description, id, time }
+    map go <$> readArrayBuffer b o
 
 instance dynamicByteLengthEvent :: DynamicByteLength index => DynamicByteLength (Event index) where
-  byteLength (Event { name, description, id, time }) = byteLength (tuple4 name description fixedBytesId time)
-    where
-    fixedBytesId = map (Uint8 <<< UInt.fromInt) (UUID.toBytes id)
+  byteLength (Event { name, description, id, time }) = byteLength (tuple4 name description id time)
 
 instance arbitraryEvent :: Arbitrary index => Arbitrary (Event index) where
   arbitrary = do
     name <- genString
     description <- genString
-    let
-      id = unsafePerformEffect (UUID.genUUID)
+    id <- arbitrary
     time <- arbitrary
     pure (Event { name, description, id, time })

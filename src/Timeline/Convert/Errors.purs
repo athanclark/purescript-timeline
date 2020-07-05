@@ -6,11 +6,13 @@ import Timeline.UI.Event (Event) as UI
 import Timeline.UI.TimeSpan (TimeSpan) as UI
 import Timeline.Data (TimeScale) as Data
 import Timeline.ID.TimeSpace (TimeSpaceID)
+import Timeline.ID.Timeline (TimelineID)
+import Timeline.ID.Event (EventID)
+import Timeline.ID.TimeSpan (TimeSpanID)
 import Timeline.Time.Unit (DecidedUnit)
 import Timeline.Time.Value (DecidedValue)
 import Timeline.Time.Span (Span)
 import Prelude
-import Data.UUID (UUID)
 import Data.Generic.Rep (class Generic)
 import Data.Generic.Rep.Show (genericShow)
 
@@ -35,11 +37,11 @@ instance showPopulateError :: Show PopulateError where
 
 data SynthesizeError
   = TimeSpaceDoesntExist TimeSpaceID
-  | TimelineDoesntExist UUID
-  | SiblingEventDoesntExist UUID
-  | SiblingTimeSpanDoesntExist UUID
-  | ChildEventDoesntExist UUID
-  | ChildTimeSpanDoesntExists UUID
+  | TimelineDoesntExist TimelineID
+  | SiblingEventDoesntExist EventID
+  | SiblingTimeSpanDoesntExist TimeSpanID
+  | ChildEventDoesntExist EventID
+  | ChildTimeSpanDoesntExists TimeSpanID
   | NoRootExists
   | ConvertDecidedValueError
     { decidedUnit :: DecidedUnit
