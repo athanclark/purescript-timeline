@@ -67,13 +67,15 @@ localstorageKey = "Siblings"
 
 -- TODO predicate from top-level index, and seek from selected time space.
 newSiblingsSignal ::
-  IxSignal ( read :: S.READ ) Settings ->
+  { settingsSignal :: IxSignal ( read :: S.READ ) Settings
+  , initialSiblings :: Siblings
+  } ->
   Effect (IxSignal ( read :: S.READ, write :: S.WRITE ) Siblings)
-newSiblingsSignal settingsSignal = do
+newSiblingsSignal { settingsSignal, initialSiblings } = do
   store <- window >>= localStorage
   mItem <- getItem localstorageKey store
   item <- case mItem of
-    Nothing -> pure def
+    Nothing -> pure initialSiblings
     Just s -> case jsonParser s >>= decodeJson of
       Left e -> throw $ "Couldn't parse Siblings: " <> e
       Right x -> pure x
