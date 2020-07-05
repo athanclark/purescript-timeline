@@ -38,6 +38,7 @@ import Data.Argonaut
   , stringify
   , jsonParser
   )
+import Data.Default (class Default, def)
 import Web.HTML (window)
 import Web.HTML.Window (localStorage)
 import Web.Storage.Storage (setItem, getItem)
@@ -46,6 +47,7 @@ import Effect.Console (warn)
 import Zeta.Types (READ, WRITE) as S
 import IxZeta (IxSignal, make, subscribeDiffLight)
 import Test.QuickCheck (class Arbitrary, arbitrary)
+import Test.QuickCheck.UTF8String (genString)
 
 -- | The `Settings` record, which is JSON encodable so it can be stored.
 newtype Settings
@@ -53,6 +55,7 @@ newtype Settings
   { isEditable :: Boolean -- ^ `true` when opening a new timeline, `false` when loading one
   , isSearchable :: Boolean -- ^ `true` shows side panels
   , localCacheTilExport :: Boolean -- ^ `true` by default - store local changes until export
+  , filename :: String
   }
 
 derive instance genericSettings :: Generic Settings _
@@ -66,15 +69,18 @@ instance arbitrarySettings :: Arbitrary Settings where
     isEditable <- arbitrary
     isSearchable <- arbitrary
     localCacheTilExport <- arbitrary
-    pure (Settings { isEditable, isSearchable, localCacheTilExport })
+    filename <- genString
+    pure (Settings { isEditable, isSearchable, localCacheTilExport, filename })
 
 instance encodeJsonSettings :: EncodeJson Settings where
-  encodeJson (Settings { isEditable, isSearchable, localCacheTilExport }) =
+  encodeJson (Settings { isEditable, isSearchable, localCacheTilExport, filename }) =
     "isEditable" := isEditable
       ~> "isSearchable"
       := isSearchable
       ~> "localCacheTilExport"
       := localCacheTilExport
+      ~> "filename"
+      := filename
       ~> jsonEmptyObject
 
 instance decodeJsonSettings :: DecodeJson Settings where
@@ -83,7 +89,17 @@ instance decodeJsonSettings :: DecodeJson Settings where
     isEditable <- o .: "isEditable"
     isSearchable <- o .: "isSearchable"
     localCacheTilExport <- o .: "localCacheTilExport"
-    pure (Settings { isEditable, isSearchable, localCacheTilExport })
+    filename <- o .: "filename"
+    pure (Settings { isEditable, isSearchable, localCacheTilExport, filename })
+
+instance defaultSettings :: Default Settings where
+  def =
+    Settings
+      { isEditable: true
+      , isSearchable: true
+      , localCacheTilExport: true
+      , filename: "filename"
+      }
 
 -- | The key to be used by the `Handler` that listens to the signal for changes
 localstorageSignalKey :: String
@@ -102,21 +118,14 @@ newSettingsSignal ::
 newSettingsSignal { wasOpenedByShareLink } = do
   store <- window >>= localStorage
   mItem <- getItem localstorageKey store
-  let
-    isEditable = not wasOpenedByShareLink
-
-    def =
-      Settings
-        { isEditable
-        , isSearchable: isEditable
-        , localCacheTilExport: true
-        }
   item <- case mItem of
     Nothing -> pure def
     Just s -> case jsonParser s >>= decodeJson of
       Left e -> do
         warn $ "Couldn't parse Settings: " <> e
-        pure def
+        pure
+          $ case def of
+              Settings x -> Settings x { isEditable = not wasOpenedByShareLink }
       Right x -> pure x
   sig <- make item
   -- Always store settings
@@ -124,7 +133,3 @@ newSettingsSignal { wasOpenedByShareLink } = do
     handler x = setItem localstorageKey (stringify (encodeJson x)) store
   subscribeDiffLight localstorageSignalKey handler sig
   pure sig
-
--- | What the settings value should be for new users, with no link opened.
-defaultSettings :: Settings
-defaultSettings = Settings { isEditable: true, isSearchable: true, localCacheTilExport: true }
