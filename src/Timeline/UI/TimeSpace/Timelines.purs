@@ -1,11 +1,10 @@
 module Timeline.UI.TimeSpace.Timelines where
 
-import Timeline.UI.Timeline (Timeline(..))
+import Timeline.UI.Timeline (Timeline)
 import Timeline.UI.Settings (Settings(..))
 import Prelude
 import Data.Maybe (Maybe(..))
 import Data.Either (Either(..))
-import Data.Default (class Default, def)
 import Data.Argonaut (class EncodeJson, class DecodeJson, jsonParser, decodeJson, stringify, encodeJson)
 import Data.Generic.Rep (class Generic)
 import Effect (Effect)

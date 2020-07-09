@@ -1,16 +1,11 @@
 module Timeline.UI.TimeSpace.Siblings where
 
-import Timeline.Time.Value (DecidedValue(..))
-import Timeline.Time.Span (DecidedSpan(..))
-import Timeline.UI.Event (Event(..))
-import Timeline.UI.TimeSpan (TimeSpan(..))
-import Timeline.UI.EventOrTimeSpan (EventOrTimeSpan(..))
+import Timeline.UI.EventOrTimeSpan (EventOrTimeSpan)
 import Timeline.UI.Settings (Settings(..))
 import Prelude
 import Data.Maybe (Maybe(..))
 import Data.Either (Either(..))
 import Data.Generic.Rep (class Generic)
-import Data.Default (class Default, def)
 import Data.Argonaut (class EncodeJson, class DecodeJson, jsonParser, stringify, decodeJson, encodeJson)
 import Test.QuickCheck (class Arbitrary)
 import Effect (Effect)

@@ -12,7 +12,7 @@ import Timeline.ID.Event (EventID)
 import Timeline.ID.TimeSpan (TimeSpanID)
 import Prelude
 import Data.Maybe (Maybe(..))
-import Data.Either (Either(..), note)
+import Data.Either (Either(..))
 import Control.Monad.Except.Trans (ExceptT, runExceptT)
 import Control.Monad.Error.Class (class MonadThrow, throwError)
 import Control.Monad.Reader.Trans (ReaderT, runReaderT)

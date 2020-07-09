@@ -14,7 +14,6 @@ import Timeline.UI.TimeSpace.TimeScale (TimeScale) as UI
 import Timeline.UI.TimeSpace.Timelines (Timelines) as UI
 import Timeline.UI.TimeSpace.Siblings (Siblings) as UI
 import Timeline.Convert (populate, synthesize) as Convert
-import Timeline.Convert.UISets (new) as UISets
 
 import Prelude
 import Data.Maybe (Maybe (..))

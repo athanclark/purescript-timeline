@@ -1,7 +1,7 @@
 module Timeline.Convert where
 
 import Timeline.Convert.UISets
-  ( UISets(..)
+  ( UISets
   , UISetsM
   , runUISetsM
   , addTimeSpace
@@ -44,10 +44,10 @@ import Timeline.Time.Value (DecidedValue(..))
 import Timeline.Time.Span (makeDecidedSpan, unmakeDecidedSpan)
 import Prelude
 import Data.Maybe (Maybe(..))
-import Data.Either (Either(..), note)
+import Data.Either (Either(..))
 import Data.Tuple (Tuple(..))
 import Data.Array (snoc, foldM, mapMaybe, concatMap) as Array
-import Data.Traversable (traverse, sequence)
+import Data.Traversable (traverse)
 import Control.Monad.Error.Class (throwError)
 import Control.Monad.Reader.Class (ask)
 import Effect (Effect)

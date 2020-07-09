@@ -26,7 +26,6 @@ import Data.Argonaut
   , stringify
   )
 import Effect (Effect)
-import Effect.Unsafe (unsafePerformEffect)
 import Effect.Exception (throw)
 import Web.HTML (window)
 import Web.HTML.Window (localStorage)
