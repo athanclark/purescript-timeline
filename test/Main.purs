@@ -14,6 +14,7 @@ import Timeline.UI.TimeSpace.TimeScale (TimeScale) as UI
 import Timeline.UI.TimeSpace.Timelines (Timelines) as UI
 import Timeline.UI.TimeSpace.Siblings (Siblings) as UI
 import Timeline.Convert (populate, synthesize) as Convert
+import Timeline.Convert.UISets (new) as UISets
 
 import Prelude
 import Data.Maybe (Maybe (..))
@@ -72,9 +73,9 @@ tests = do
       jsonTest "Siblings" (Proxy :: Proxy UI.Siblings)
   describe "Timeline.Convert" do
     let synthesizePopulateIso :: Data.TimeSpaceDecided -> Result
-        synthesizePopulateIso x = case Convert.populate x of
+        synthesizePopulateIso x = case unsafePerformEffect (Convert.populate x) of
           Left popError -> Failed $ "Populate error: " <> show popError
-          Right sets -> case Convert.synthesize sets of
+          Right sets -> case unsafePerformEffect (Convert.synthesize sets) of
             Left synthError -> Failed $ "Synthesize error: " <> show synthError
             Right y
               | x == y -> Success

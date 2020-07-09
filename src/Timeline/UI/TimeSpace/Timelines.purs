@@ -34,25 +34,6 @@ derive newtype instance decodeJsonTimelines :: DecodeJson Timelines
 
 derive newtype instance arbitraryTimelines :: Arbitrary Timelines
 
--- FIXME dummy data
-instance defaultTimelines :: Default Timelines where
-  def =
-    let
-      rename s =
-        let
-          Timeline x = def
-        in
-          Timeline x { name = s }
-    in
-      Timelines
-        [ rename "Timeline A"
-        , rename "Timeline B"
-        , rename "Timeline C"
-        , rename "Timeline D"
-        , rename "Timeline E"
-        , rename "Timeline F"
-        ]
-
 localstorageSignalKey :: String
 localstorageSignalKey = "localstorage"
 
@@ -87,7 +68,7 @@ clearTimelinesCache = do
   store <- window >>= localStorage
   removeItem localstorageKey store
 
-setDefaultTimelines ::
+setNewDocumentTimelines ::
   IxSignal ( write :: S.WRITE ) Timelines ->
   Effect Unit
-setDefaultTimelines timelinesSignal = set def timelinesSignal
+setNewDocumentTimelines timelinesSignal = set (Timelines []) timelinesSignal

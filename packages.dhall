@@ -119,41 +119,47 @@ let additions =
 
 
 let upstream =
-      https://github.com/purescript/package-sets/releases/download/psc-0.13.8-20200615/packages.dhall sha256:5d0cfad9408c84db0a3fdcea2d708f9ed8f64297e164dc57a7cf6328706df93a
+      https://github.com/purescript/package-sets/releases/download/psc-0.13.8-20200708/packages.dhall sha256:df5b0f1ae92d4401404344f4fb2a7a3089612c9f30066dcddf9eaea4fe780e29
 
 let overrides =
-  { uuid =
-    { dependencies = ["foreign-generic", "sized-vectors"]
-    , repo = "https://github.com/openchronology/purescript-uuid.git"
-    , version = "master"
-    }
-  , arraybuffer-class = upstream.arraybuffer-class //
-    { version = "v0.2.6"
-    }
-  }
+      { uuid =
+        { dependencies = [ "foreign-generic", "sized-vectors" ]
+        , repo = "https://github.com/openchronology/purescript-uuid.git"
+        , version = "master"
+        }
+      , arraybuffer-class = upstream.arraybuffer-class // { version = "v0.2.6" }
+      }
 
 let additions =
-  { indexed-array =
-    { dependencies = [ "arrays", "foreign-object", "generics-rep", "quickcheck-utf8" ]
-    , repo = "https://github.com/openchronology/purescript-indexed-array.git"
-    , version = "v0.0.0"
-    }
-  , quickcheck-utf8 =
-    { dependencies = [ "quickcheck" ]
-    , repo =
-        "https://github.com/openchronology/purescript-quickcheck-utf8.git"
-    , version = "master"
-    }
-  , file-store =
-    { dependencies = [ "aff", "arraybuffer", "b64", "promises", "web-html" ]
-    , repo = "https://github.com/openchronology/purescript-file-store.git"
-    , version = "master"
-    }
-  , timeline-time =
-    { dependencies = ["arraybuffer-class", "argonaut"]
-    , repo = "https://github.com/openchronology/purescript-timeline-time.git"
-    , version = "master"
-    }
-  }
+      { indexed-array =
+        { dependencies =
+          [ "arrays", "foreign-object", "generics-rep", "quickcheck-utf8" ]
+        , repo =
+            "https://github.com/openchronology/purescript-indexed-array.git"
+        , version = "v0.0.0"
+        }
+      , quickcheck-utf8 =
+        { dependencies = [ "quickcheck" ]
+        , repo =
+            "https://github.com/openchronology/purescript-quickcheck-utf8.git"
+        , version = "master"
+        }
+      , file-store =
+        { dependencies = [ "aff", "arraybuffer", "b64", "promises", "web-html" ]
+        , repo = "https://github.com/openchronology/purescript-file-store.git"
+        , version = "master"
+        }
+      , timeline-time =
+        { dependencies = [ "arraybuffer-class", "argonaut" ]
+        , repo =
+            "https://github.com/openchronology/purescript-timeline-time.git"
+        , version = "master"
+        }
+      , zeta-mapping =
+        { dependencies = [ "zeta", "queue", "profunctor", "generics-rep" ]
+        , repo = "https://github.com/openchronology/purescript-zeta-mapping.git"
+        , version = "master"
+        }
+      }
 
 in  upstream // overrides // additions

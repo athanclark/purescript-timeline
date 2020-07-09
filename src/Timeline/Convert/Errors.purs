@@ -21,14 +21,11 @@ data PopulateError
     { decidedUnit :: DecidedUnit
     , timeScale :: Data.TimeScale DecidedValue
     }
-  | TimeSpaceExists { timeSpace :: UI.TimeSpace, sets :: String }
+  | TimeSpaceExists UI.TimeSpace
   | TimelineExists UI.Timeline
-  | SiblingEventExists UI.Event
-  | SiblingTimeSpanExists UI.TimeSpan
-  | SiblingTimeSpanMakeSpanFailed (Span DecidedValue)
-  | ChildEventExists UI.Event
-  | ChildTimeSpanExists UI.TimeSpan
-  | ChildTimeSpanMakeSpanFailed (Span DecidedValue)
+  | EventExists UI.Event
+  | TimeSpanExists UI.TimeSpan
+  | TimeSpanMakeSpanFailed (Span DecidedValue)
 
 derive instance genericPopulateError :: Generic PopulateError _
 
@@ -38,10 +35,8 @@ instance showPopulateError :: Show PopulateError where
 data SynthesizeError
   = TimeSpaceDoesntExist TimeSpaceID
   | TimelineDoesntExist TimelineID
-  | SiblingEventDoesntExist EventID
-  | SiblingTimeSpanDoesntExist TimeSpanID
-  | ChildEventDoesntExist EventID
-  | ChildTimeSpanDoesntExists TimeSpanID
+  | EventDoesntExist EventID
+  | TimeSpanDoesntExist TimeSpanID
   | NoRootExists
   | ConvertDecidedValueError
     { decidedUnit :: DecidedUnit

@@ -17,6 +17,7 @@ You can edit this file as you like.
   , "uuid"
   , "web-html"
   , "zeta"
+  , "zeta-mapping"
   ]
 , packages = ./packages.dhall
 , sources = [ "src/**/*.purs", "test/**/*.purs" ]

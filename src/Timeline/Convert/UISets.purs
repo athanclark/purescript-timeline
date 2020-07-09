@@ -13,239 +13,160 @@ import Timeline.ID.TimeSpan (TimeSpanID)
 import Prelude
 import Data.Maybe (Maybe(..))
 import Data.Either (Either(..), note)
-import Data.Generic.Rep (class Generic)
-import Foreign.Object (Object)
-import Foreign.Object (union, empty, lookup, insert, member) as Object
+import Control.Monad.Except.Trans (ExceptT, runExceptT)
+import Control.Monad.Error.Class (class MonadThrow, throwError)
+import Control.Monad.Reader.Trans (ReaderT, runReaderT)
+import Control.Monad.Reader.Class (class MonadAsk, ask)
+import Effect (Effect)
+import Effect.Ref (Ref)
+import Effect.Ref (new, write, read) as Ref
+import Effect.Class (class MonadEffect, liftEffect)
+import IxZeta.Map (IxSignalMap)
+import IxZeta.Map (new, set, set', get) as IxSignalMap
+import Zeta.Types (READ, WRITE) as S
+import Unsafe.Coerce (unsafeCoerce)
 
 -- | Sets for all content, indexed by their UUID
 newtype UISets
   = UISets
-  { timeSpaces :: Object UI.TimeSpace
-  , timelines :: Object UI.Timeline
-  , siblingEvents :: Object UI.Event
-  , siblingTimeSpans :: Object UI.TimeSpan
-  , childEvents :: Object UI.Event
-  , childTimeSpans :: Object UI.TimeSpan
-  , root :: Maybe TimeSpaceID
+  { timeSpaces :: IxSignalMap TimeSpaceID ( read :: S.READ, write :: S.WRITE ) UI.TimeSpace
+  , timelines :: IxSignalMap TimelineID ( read :: S.READ, write :: S.WRITE ) UI.Timeline
+  , events :: IxSignalMap EventID ( read :: S.READ, write :: S.WRITE ) UI.Event
+  , timeSpans :: IxSignalMap TimeSpanID ( read :: S.READ, write :: S.WRITE ) UI.TimeSpan
+  , root :: Ref (Maybe TimeSpaceID)
   }
 
--- FIXME may need reference to their parent?
-derive instance genericUISets :: Generic UISets _
+new :: Effect UISets
+new = do
+  timeSpaces <- IxSignalMap.new { fromString: unsafeCoerce, toString: unsafeCoerce }
+  timelines <- IxSignalMap.new { fromString: unsafeCoerce, toString: unsafeCoerce }
+  events <- IxSignalMap.new { fromString: unsafeCoerce, toString: unsafeCoerce }
+  timeSpans <- IxSignalMap.new { fromString: unsafeCoerce, toString: unsafeCoerce }
+  root <- Ref.new Nothing
+  pure
+    $ UISets
+        { timeSpaces, timelines, events, timeSpans, root }
 
-derive newtype instance showUISets :: Show UISets
+newtype UISetsM e a
+  = UISetsM (ReaderT UISets (ExceptT e Effect) a)
 
-instance semigroupUISets :: Semigroup UISets where
-  append (UISets x) (UISets y) =
-    UISets
-      { timeSpaces: Object.union y.timeSpaces x.timeSpaces
-      , timelines: Object.union y.timelines x.timelines
-      , siblingEvents: Object.union y.siblingEvents x.siblingEvents
-      , siblingTimeSpans: Object.union y.siblingTimeSpans x.siblingTimeSpans
-      , childEvents: Object.union y.childEvents x.childEvents
-      , childTimeSpans: Object.union y.childTimeSpans x.childTimeSpans
-      , root:
-          case y.root of
-            Nothing -> x.root
-            _ -> y.root
-      }
+derive newtype instance functorUISetsM :: Functor (UISetsM e)
 
-instance monoidUISets :: Monoid UISets where
-  mempty =
-    UISets
-      { timeSpaces: Object.empty
-      , timelines: Object.empty
-      , siblingEvents: Object.empty
-      , siblingTimeSpans: Object.empty
-      , childEvents: Object.empty
-      , childTimeSpans: Object.empty
-      , root: Nothing
-      }
+derive newtype instance applyUISetsM :: Apply (UISetsM e)
+
+derive newtype instance applicativeUISetsM :: Applicative (UISetsM e)
+
+derive newtype instance bindUISetsM :: Bind (UISetsM e)
+
+derive newtype instance monadUISetsM :: Monad (UISetsM e)
+
+derive newtype instance monadEffectUISetsM :: MonadEffect (UISetsM e)
+
+derive newtype instance monadThrowUISetsM :: MonadThrow e (UISetsM e)
+
+-- derive newtype instance monadErrorUISetsM :: MonadError e (UISetsM e)
+derive newtype instance monadAskUISetsM :: MonadAsk UISets (UISetsM e)
+
+runUISetsM :: forall e a. UISetsM e a -> UISets -> Effect (Either e a)
+runUISetsM (UISetsM x) s = runExceptT (runReaderT x s)
 
 -- | Includes an already flat time space - doesn't verify constituents
-addTimeSpace :: UI.TimeSpace -> UISets -> Either PopulateError UISets
-addTimeSpace x@(UI.TimeSpace { id }) (UISets xs) =
-  let
-    id' = show id
-  in
-    if Object.member id' xs.timeSpaces then
-      Left (TimeSpaceExists { timeSpace: x, sets: show (UISets xs) })
-    else
-      Right
-        $ UISets
-            xs
-              { timeSpaces = Object.insert id' x xs.timeSpaces
-              }
+addTimeSpace :: UI.TimeSpace -> UISetsM PopulateError Unit
+addTimeSpace x@(UI.TimeSpace { id }) = do
+  UISets { timeSpaces } <- ask
+  succeeded <- liftEffect (IxSignalMap.set' id x timeSpaces)
+  if succeeded then
+    pure unit
+  else
+    throwError (TimeSpaceExists x)
 
 -- | Doesn't fail when existing - just re-assigns
-addTimeSpace' :: UI.TimeSpace -> UISets -> UISets
-addTimeSpace' x@(UI.TimeSpace { id }) (UISets xs) =
-  let
-    id' = show id
-  in
-    UISets
-      xs
-        { timeSpaces = Object.insert id' x xs.timeSpaces
-        }
+addTimeSpace' :: UI.TimeSpace -> UISets -> Effect Unit
+addTimeSpace' x@(UI.TimeSpace { id }) (UISets { timeSpaces }) = IxSignalMap.set id x timeSpaces
 
 -- | Looks for an already flat time space in the sets
-getTimeSpace :: TimeSpaceID -> UISets -> Either SynthesizeError UI.TimeSpace
-getTimeSpace id (UISets { timeSpaces }) = note (TimeSpaceDoesntExist id) (Object.lookup (show id) timeSpaces)
+getTimeSpace :: TimeSpaceID -> UISetsM SynthesizeError UI.TimeSpace
+getTimeSpace id = do
+  UISets { timeSpaces } <- ask
+  mTimeSpace <- liftEffect (IxSignalMap.get id timeSpaces)
+  case mTimeSpace of
+    Nothing -> throwError (TimeSpaceDoesntExist id)
+    Just timeSpace -> pure timeSpace
 
 -- | Includes an already flat timeline - doesn't verify constituents
-addTimeline :: UI.Timeline -> UISets -> Either PopulateError UISets
-addTimeline x@(UI.Timeline { id }) (UISets xs) =
-  let
-    id' = show id
-  in
-    if Object.member id' xs.timelines then
-      Left (TimelineExists x)
-    else
-      Right
-        $ UISets
-            xs
-              { timelines = Object.insert id' x xs.timelines
-              }
+addTimeline :: UI.Timeline -> UISetsM PopulateError Unit
+addTimeline x@(UI.Timeline { id }) = do
+  UISets { timelines } <- ask
+  succeeded <- liftEffect (IxSignalMap.set' id x timelines)
+  if succeeded then
+    pure unit
+  else
+    throwError (TimelineExists x)
 
-addTimeline' :: UI.Timeline -> UISets -> UISets
-addTimeline' x@(UI.Timeline { id }) (UISets xs) =
-  let
-    id' = show id
-  in
-    UISets
-      xs
-        { timelines = Object.insert id' x xs.timelines
-        }
+addTimeline' :: UI.Timeline -> UISets -> Effect Unit
+addTimeline' x@(UI.Timeline { id }) (UISets { timelines }) = IxSignalMap.set id x timelines
 
 -- | Looks for an already flat timeline in the sets
-getTimeline :: TimelineID -> UISets -> Either SynthesizeError UI.Timeline
-getTimeline id (UISets { timelines }) = note (TimelineDoesntExist id) (Object.lookup (show id) timelines)
+getTimeline :: TimelineID -> UISetsM SynthesizeError UI.Timeline
+getTimeline id = do
+  UISets { timelines } <- ask
+  mTimeline <- liftEffect (IxSignalMap.get id timelines)
+  case mTimeline of
+    Nothing -> throwError (TimelineDoesntExist id)
+    Just timeline -> pure timeline
 
 -- | Includes an already flat event as a sibling - doesn't verify constituents
-addSiblingEvent :: UI.Event -> UISets -> Either PopulateError UISets
-addSiblingEvent x@(UI.Event { id }) (UISets xs) =
-  let
-    id' = show id
-  in
-    if Object.member id' xs.siblingEvents then
-      Left (SiblingEventExists x)
-    else
-      Right
-        $ UISets
-            xs
-              { siblingEvents = Object.insert id' x xs.siblingEvents
-              }
+addEvent :: UI.Event -> UISetsM PopulateError Unit
+addEvent x@(UI.Event { id }) = do
+  UISets { events } <- ask
+  succeeded <- liftEffect (IxSignalMap.set' id x events)
+  if succeeded then
+    pure unit
+  else
+    throwError (EventExists x)
 
-addSiblingEvent' :: UI.Event -> UISets -> UISets
-addSiblingEvent' x@(UI.Event { id }) (UISets xs) =
-  let
-    id' = show id
-  in
-    UISets
-      xs
-        { siblingEvents = Object.insert id' x xs.siblingEvents
-        }
+addEvent' :: UI.Event -> UISets -> Effect Unit
+addEvent' x@(UI.Event { id }) (UISets { events }) = IxSignalMap.set id x events
 
 -- | Looks for an already flat event (as a sibling) in the sets
-getSiblingEvent :: EventID -> UISets -> Either SynthesizeError UI.Event
-getSiblingEvent id (UISets { siblingEvents }) = note (SiblingEventDoesntExist id) (Object.lookup (show id) siblingEvents)
+getEvent :: EventID -> UISetsM SynthesizeError UI.Event
+getEvent id = do
+  UISets { events } <- ask
+  mEvent <- liftEffect (IxSignalMap.get id events)
+  case mEvent of
+    Nothing -> throwError (EventDoesntExist id)
+    Just event -> pure event
 
 -- | Includes an already flat time span as a sibling - doesn't verify constituents
-addSiblingTimeSpan :: UI.TimeSpan -> UISets -> Either PopulateError UISets
-addSiblingTimeSpan x@(UI.TimeSpan { id }) (UISets xs) =
-  let
-    id' = show id
-  in
-    if Object.member id' xs.siblingTimeSpans then
-      Left (SiblingTimeSpanExists x)
-    else
-      Right
-        $ UISets
-            xs
-              { siblingTimeSpans = Object.insert id' x xs.siblingTimeSpans
-              }
+addTimeSpan :: UI.TimeSpan -> UISetsM PopulateError Unit
+addTimeSpan x@(UI.TimeSpan { id }) = do
+  UISets { timeSpans } <- ask
+  succeeded <- liftEffect (IxSignalMap.set' id x timeSpans)
+  if succeeded then
+    pure unit
+  else
+    throwError (TimeSpanExists x)
 
-addSiblingTimeSpan' :: UI.TimeSpan -> UISets -> UISets
-addSiblingTimeSpan' x@(UI.TimeSpan { id }) (UISets xs) =
-  let
-    id' = show id
-  in
-    UISets
-      xs
-        { siblingTimeSpans = Object.insert id' x xs.siblingTimeSpans
-        }
+addTimeSpan' :: UI.TimeSpan -> UISets -> Effect Unit
+addTimeSpan' x@(UI.TimeSpan { id }) (UISets { timeSpans }) = IxSignalMap.set id x timeSpans
 
 -- | Looks for an already flat time span (as a sibling) in the sets
-getSiblingTimeSpan :: TimeSpanID -> UISets -> Either SynthesizeError UI.TimeSpan
-getSiblingTimeSpan id (UISets { siblingTimeSpans }) = note (SiblingTimeSpanDoesntExist id) (Object.lookup (show id) siblingTimeSpans)
+getTimeSpan :: TimeSpanID -> UISetsM SynthesizeError UI.TimeSpan
+getTimeSpan id = do
+  UISets { timeSpans } <- ask
+  mTimeSpan <- liftEffect (IxSignalMap.get id timeSpans)
+  case mTimeSpan of
+    Nothing -> throwError (TimeSpanDoesntExist id)
+    Just timeSpan -> pure timeSpan
 
-getSibling :: UI.EventOrTimeSpanPoly EventID TimeSpanID -> UISets -> Either SynthesizeError UI.EventOrTimeSpan
-getSibling (UI.EventOrTimeSpanPoly eOrTs) sets = case eOrTs of
-  Left e -> UI.EventOrTimeSpan <<< Left <$> getSiblingEvent e sets
-  Right ts -> UI.EventOrTimeSpan <<< Right <$> getSiblingTimeSpan ts sets
-
--- | Includes an already flat event as a child - doesn't verify constituents
-addChildEvent :: UI.Event -> UISets -> Either PopulateError UISets
-addChildEvent x@(UI.Event { id }) (UISets xs) =
-  let
-    id' = show id
-  in
-    if Object.member id' xs.childEvents then
-      Left (ChildEventExists x)
-    else
-      Right
-        $ UISets
-            xs
-              { childEvents = Object.insert id' x xs.childEvents
-              }
-
-addChildEvent' :: UI.Event -> UISets -> UISets
-addChildEvent' x@(UI.Event { id }) (UISets xs) =
-  let
-    id' = show id
-  in
-    UISets
-      xs
-        { childEvents = Object.insert id' x xs.childEvents
-        }
-
--- | Looks for an already flat event (as a child) in the sets
-getChildEvent :: EventID -> UISets -> Either SynthesizeError UI.Event
-getChildEvent id (UISets { childEvents }) = note (ChildEventDoesntExist id) (Object.lookup (show id) childEvents)
-
--- | Includes an already flat time span as a child - doesn't verify constituents
-addChildTimeSpan :: UI.TimeSpan -> UISets -> Either PopulateError UISets
-addChildTimeSpan x@(UI.TimeSpan { id }) (UISets xs) =
-  let
-    id' = show id
-  in
-    if Object.member id' xs.childTimeSpans then
-      Left (ChildTimeSpanExists x)
-    else
-      Right
-        $ UISets
-            xs
-              { childTimeSpans = Object.insert id' x xs.childTimeSpans
-              }
-
-addChildTimeSpan' :: UI.TimeSpan -> UISets -> UISets
-addChildTimeSpan' x@(UI.TimeSpan { id }) (UISets xs) =
-  let
-    id' = show id
-  in
-    UISets
-      xs
-        { childTimeSpans = Object.insert id' x xs.childTimeSpans
-        }
-
--- | Looks for an already flat time span (as a child) in the sets
-getChildTimeSpan :: TimeSpanID -> UISets -> Either SynthesizeError UI.TimeSpan
-getChildTimeSpan id (UISets { childTimeSpans }) = note (ChildTimeSpanDoesntExists id) (Object.lookup (show id) childTimeSpans)
-
-getChild :: UI.EventOrTimeSpanPoly EventID TimeSpanID -> UISets -> Either SynthesizeError UI.EventOrTimeSpan
-getChild (UI.EventOrTimeSpanPoly eOrTs) sets = case eOrTs of
-  Left e -> UI.EventOrTimeSpan <<< Left <$> getChildEvent e sets
-  Right ts -> UI.EventOrTimeSpan <<< Right <$> getChildTimeSpan ts sets
+getEventOrTimeSpan :: UI.EventOrTimeSpanPoly EventID TimeSpanID -> UISetsM SynthesizeError UI.EventOrTimeSpan
+getEventOrTimeSpan (UI.EventOrTimeSpanPoly eOrTs) = case eOrTs of
+  Left e -> UI.EventOrTimeSpan <<< Left <$> getEvent e
+  Right ts -> UI.EventOrTimeSpan <<< Right <$> getTimeSpan ts
 
 -- | Assigns the root field of a set
-setRoot :: TimeSpaceID -> UISets -> UISets
-setRoot id (UISets x) = UISets x { root = Just id }
+setRoot :: TimeSpaceID -> UISets -> Effect Unit
+setRoot id (UISets { root }) = Ref.write (Just id) root
+
+getRoot :: UISets -> Effect (Maybe TimeSpaceID)
+getRoot (UISets { root }) = Ref.read root

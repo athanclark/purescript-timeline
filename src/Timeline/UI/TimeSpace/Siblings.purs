@@ -36,29 +36,6 @@ derive newtype instance decodeJsonSiblings :: DecodeJson Siblings
 
 derive newtype instance arbitrarySiblings :: Arbitrary Siblings
 
--- FIXME dummy data
-instance defaultSiblings :: Default Siblings where
-  def =
-    let
-      renameEvent s v =
-        let
-          Event x = def
-        in
-          Event x { name = s, time = v }
-
-      renameTimeSpan s v =
-        let
-          TimeSpan x = def
-        in
-          TimeSpan x { name = s, span = v }
-    in
-      Siblings
-        [ EventOrTimeSpan $ Left (renameEvent "Event A" (DecidedValueNumber 3.0))
-        , EventOrTimeSpan $ Left (renameEvent "Event B" (DecidedValueNumber 3.5))
-        , EventOrTimeSpan $ Right (renameTimeSpan "TimeSpan C" (DecidedSpanNumber { start: 2.0, stop: 5.0 }))
-        , EventOrTimeSpan $ Right (renameTimeSpan "TimeSpan D" (DecidedSpanNumber { start: 1.0, stop: 4.0 }))
-        ]
-
 localstorageSignalKey :: String
 localstorageSignalKey = "localstorage"
 
@@ -93,7 +70,7 @@ clearSiblingsCache = do
   store <- window >>= localStorage
   removeItem localstorageKey store
 
-setDefaultSiblings ::
+setNewDocumentSiblings ::
   IxSignal ( write :: S.WRITE ) Siblings ->
   Effect Unit
-setDefaultSiblings siblingsSignal = set def siblingsSignal
+setNewDocumentSiblings siblingsSignal = set (Siblings []) siblingsSignal

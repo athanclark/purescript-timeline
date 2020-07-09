@@ -68,9 +68,9 @@ localstorageKey = "Children"
 -- TODO predicate from top-level index, and seek from selected time space.
 newChildrenSignal ::
   { settingsSignal :: IxSignal ( read :: S.READ ) Settings
-  , initialChildren :: Children
+  , initialChildren :: Maybe Children
   } ->
-  Effect (IxSignal ( read :: S.READ, write :: S.WRITE ) Children)
+  Effect (IxSignal ( read :: S.READ, write :: S.WRITE ) (Maybe Children))
 newChildrenSignal { settingsSignal, initialChildren } = do
   store <- window >>= localStorage
   mItem <- getItem localstorageKey store
@@ -78,7 +78,7 @@ newChildrenSignal { settingsSignal, initialChildren } = do
     Nothing -> pure initialChildren
     Just s -> case jsonParser s >>= decodeJson of
       Left e -> throw $ "Couldn't parse Children: " <> e
-      Right x -> pure x
+      Right x -> pure (Just x)
   sig <- make item
   let
     handler x = do
@@ -93,7 +93,7 @@ clearChildrenCache = do
   store <- window >>= localStorage
   removeItem localstorageKey store
 
-setDefaultChildren ::
-  IxSignal ( write :: S.WRITE ) Children ->
+setNewDocumentChildren ::
+  IxSignal ( write :: S.WRITE ) (Maybe Children) ->
   Effect Unit
-setDefaultChildren childrenSignal = set def childrenSignal
+setNewDocumentChildren childrenSignal = set Nothing childrenSignal

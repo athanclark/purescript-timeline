@@ -10,7 +10,7 @@ import Timeline.ID.TimeSpan (TimeSpanID)
 import Prelude
 import Data.Maybe (Maybe(..))
 import Data.Either (Either(..))
-import Data.Default (class Default, def)
+import Data.Default (def)
 import Data.UUID (genUUID) as UUID
 import Data.Generic.Rep (class Generic)
 import Data.Argonaut
@@ -88,16 +88,26 @@ instance arbitraryEvent :: Arbitrary TimeSpace where
     id <- arbitrary
     pure (TimeSpace { title, description, timeScale, siblings, timelines, id })
 
-instance defaultTimeSpace :: Default TimeSpace where
-  def =
-    TimeSpace
-      { title: "TimeSpace Name"
-      , description: ""
-      , timeScale: def
-      , siblings: []
-      , timelines: []
-      , id: TimeSpaceID (unsafePerformEffect UUID.genUUID)
-      }
+defaultTimeSpace :: Effect TimeSpace
+defaultTimeSpace = newTimeSpace { title: "TimeSpace Name", description: "", timeScale: def }
+
+newTimeSpace ::
+  { title :: String
+  , description :: String
+  , timeScale :: TimeScale
+  } ->
+  Effect TimeSpace
+newTimeSpace { title, description, timeScale } = do
+  id <- UUID.genUUID
+  pure
+    $ TimeSpace
+        { title
+        , description
+        , timeScale
+        , siblings: []
+        , timelines: []
+        , id: TimeSpaceID id
+        }
 
 localstorageSignalKey :: String
 localstorageSignalKey = "localstorage"
@@ -116,7 +126,7 @@ newTimeSpaceSignal { settingsSignal, initialTimeSpace } = do
   store <- window >>= localStorage
   mItem <- getItem localstorageKey store
   item <- case mItem of
-    Nothing -> pure def
+    Nothing -> pure initialTimeSpace
     Just s -> case jsonParser s >>= decodeJson of
       Left e -> throw $ "Couldn't parse TimeSpace: " <> e
       Right x -> pure x
@@ -134,7 +144,9 @@ clearTimeSpaceCache = do
   store <- window >>= localStorage
   removeItem localstorageKey store
 
-setDefaultTimeSpace ::
+setNewDocumentTimeSpace ::
   IxSignal ( write :: S.WRITE ) TimeSpace ->
   Effect Unit
-setDefaultTimeSpace timeSpaceSignal = set def timeSpaceSignal
+setNewDocumentTimeSpace timeSpaceSignal = do
+  timeSpace <- defaultTimeSpace
+  set timeSpace timeSpaceSignal
