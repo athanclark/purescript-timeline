@@ -2,17 +2,25 @@ module Timeline.Convert where
 
 import Timeline.Convert.UISets
   ( UISets
+  , getTimeSpacesMapping
+  , getTimelinesMapping
+  , getTimeSpansMapping
+  , getRootRef
   , UISetsM
   , runUISetsM
+  , asUISetsM'
   , addTimeSpace
   , addTimeline
   , addEvent
   , addTimeSpan
   , setRoot
   , getTimeSpace
+  , getTimeSpaceScoped
   , getTimeline
+  , getTimelineScoped
   , getEvent
   , getTimeSpan
+  , getTimeSpanScoped
   , getRoot
   , new
   )
@@ -47,11 +55,13 @@ import Data.Maybe (Maybe(..))
 import Data.Either (Either(..))
 import Data.Tuple (Tuple(..))
 import Data.Array (snoc, foldM, mapMaybe, concatMap) as Array
-import Data.Traversable (traverse)
+import Data.Traversable (traverse, sequence)
 import Control.Monad.Error.Class (throwError)
-import Control.Monad.Reader.Class (ask)
 import Effect (Effect)
-import Effect.Class (liftEffect)
+import Effect.Ref (Ref)
+import Effect.Ref (read) as Ref
+import Zeta.Types (READ, readOnly) as S
+import IxZeta.Map (IxSignalMap)
 import Partial.Unsafe (unsafePartial) -- FIXME
 
 -- | Translates a recursive `TimeSpaceDecided` into a flat `UISets`.
@@ -266,48 +276,83 @@ synthesizeEventOrTimeSpan (UI.EventOrTimeSpanPoly eOrTs) = case eOrTs of
 
 -- | Synthesize the rose tree for exploring time spaces.
 synthesizeExploreTimeSpaces :: UISetsM SynthesizeError UI.ExploreTimeSpaces
-synthesizeExploreTimeSpaces = do
-  sets <- ask
-  mRoot <- liftEffect (getRoot sets)
+synthesizeExploreTimeSpaces = asUISetsM' getExplorePredicate synthesizeExploreTimeSpacesScoped
+  where
+  getExplorePredicate uiSets =
+    { timeSpacesMapping: S.readOnly (getTimeSpacesMapping uiSets)
+    , timelinesMapping: S.readOnly (getTimelinesMapping uiSets)
+    , timeSpansMapping: S.readOnly (getTimeSpansMapping uiSets)
+    , rootRef: getRootRef uiSets
+    }
+
+synthesizeExploreTimeSpacesScoped ::
+  { timeSpacesMapping :: IxSignalMap TimeSpaceID ( read :: S.READ ) UI.TimeSpace
+  , timelinesMapping :: IxSignalMap TimelineID ( read :: S.READ ) UI.Timeline
+  , timeSpansMapping :: IxSignalMap TimeSpanID ( read :: S.READ ) UI.TimeSpan
+  , rootRef :: Ref (Maybe TimeSpaceID)
+  } ->
+  Effect (Either SynthesizeError UI.ExploreTimeSpaces)
+synthesizeExploreTimeSpacesScoped { timeSpacesMapping, timelinesMapping, timeSpansMapping, rootRef } = do
+  mRoot <- Ref.read rootRef
   case mRoot of
-    Nothing -> throwError NoRootExists
+    Nothing -> pure (Left NoRootExists)
     Just id -> go id
   where
-  go :: TimeSpaceID -> UISetsM SynthesizeError UI.ExploreTimeSpaces
+  go :: TimeSpaceID -> Effect (Either SynthesizeError UI.ExploreTimeSpaces)
   go timeSpaceId = do
-    UI.TimeSpace
-      { title
-    , timeScale: UI.TimeScale { limit }
-    , id
-    , timelines
-    , siblings
-    } <-
-      getTimeSpace timeSpaceId
-    let
-      getSpans :: Array (UI.EventOrTimeSpanPoly EventID TimeSpanID) -> Array TimeSpanID
-      getSpans = Array.mapMaybe getSpan
-        where
-        getSpan (UI.EventOrTimeSpanPoly eOrTs) = case eOrTs of
-          Left _ -> Nothing
-          Right ts -> Just ts
-    siblings' <- traverse getTimeSpan (getSpans siblings)
-    timelines' <- traverse getTimeline timelines
-    let
-      childrenOfTimelines =
-        Array.concatMap
-          (\(UI.Timeline { children }) -> getSpans children)
-          timelines'
-    children' <- traverse getTimeSpan childrenOfTimelines
-    let
-      siblingsWithTimeSpaces = Array.mapMaybe (\(UI.TimeSpan { timeSpace }) -> timeSpace) siblings'
-
-      childrenWithTimeSpaces = Array.mapMaybe (\(UI.TimeSpan { timeSpace }) -> timeSpace) children'
-    -- recurse
-    children <- traverse go (siblingsWithTimeSpaces <> childrenWithTimeSpaces)
-    pure
-      $ UI.ExploreTimeSpaces
+    eTimeSpace <- getTimeSpaceScoped timeSpaceId timeSpacesMapping
+    case eTimeSpace of
+      Left e -> pure (Left e)
+      Right
+        ( UI.TimeSpace
           { title
-          , limit
-          , id
-          , children
-          }
+        , timeScale: UI.TimeScale { limit }
+        , id
+        , timelines
+        , siblings
+        }
+      ) -> do
+        let
+          getSpans :: Array (UI.EventOrTimeSpanPoly EventID TimeSpanID) -> Array TimeSpanID
+          getSpans = Array.mapMaybe getSpan
+            where
+            getSpan (UI.EventOrTimeSpanPoly eOrTs) = case eOrTs of
+              Left _ -> Nothing
+              Right ts -> Just ts
+        eSiblings <- traverse (flip getTimeSpanScoped timeSpansMapping) (getSpans siblings)
+        case sequence eSiblings of
+          Left e -> pure (Left e)
+          Right siblings' -> do
+            eTimelines <- traverse (flip getTimelineScoped timelinesMapping) timelines
+            case sequence eTimelines of
+              Left e -> pure (Left e)
+              Right timelines' -> do
+                let
+                  childrenOfTimelines :: Array TimeSpanID
+                  childrenOfTimelines =
+                    Array.concatMap
+                      (\(UI.Timeline { children }) -> getSpans children)
+                      timelines'
+                eChildren <- traverse (flip getTimeSpanScoped timeSpansMapping) childrenOfTimelines
+                case sequence eChildren of
+                  Left e -> pure (Left e)
+                  Right children' -> do
+                    let
+                      siblingsWithTimeSpaces :: Array TimeSpaceID
+                      siblingsWithTimeSpaces = Array.mapMaybe (\(UI.TimeSpan { timeSpace }) -> timeSpace) siblings'
+
+                      childrenWithTimeSpaces :: Array TimeSpaceID
+                      childrenWithTimeSpaces = Array.mapMaybe (\(UI.TimeSpan { timeSpace }) -> timeSpace) children'
+                    -- recurse
+                    eDescendants <- traverse go (siblingsWithTimeSpaces <> childrenWithTimeSpaces)
+                    case sequence eDescendants of
+                      Left e -> pure (Left e)
+                      Right children ->
+                        pure
+                          $ Right
+                          $ UI.ExploreTimeSpaces
+                              { title
+                              , limit
+                              , id
+                              , children
+                              }
