@@ -155,6 +155,11 @@ let additions =
             "https://github.com/openchronology/purescript-timeline-time.git"
         , version = "master"
         }
+      , zeta-array =
+        { dependencies = [ "zeta", "queue" ]
+        , repo = "https://github.com/openchronology/purescript-zeta-array.git"
+        , version = "master"
+        }
       , zeta-mapping =
         { dependencies = [ "zeta", "queue", "profunctor", "generics-rep" ]
         , repo = "https://github.com/openchronology/purescript-zeta-mapping.git"

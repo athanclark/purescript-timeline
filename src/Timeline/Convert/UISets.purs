@@ -23,7 +23,7 @@ import Effect.Ref (Ref)
 import Effect.Ref (new, write, read) as Ref
 import Effect.Class (class MonadEffect, liftEffect)
 import IxZeta.Map (IxSignalMap)
-import IxZeta.Map (new, set, set', get) as IxSignalMap
+import IxZeta.Map (new, insert, assign, get) as IxSignalMap
 import Zeta.Types (READ, WRITE, readOnly, writeOnly) as S
 import Unsafe.Coerce (unsafeCoerce)
 
@@ -112,7 +112,7 @@ addTimeSpace = asUISetsM (S.writeOnly <<< getTimeSpacesMapping) addTimeSpaceScop
 
 addTimeSpaceScoped :: UI.TimeSpace -> IxSignalMap TimeSpaceID ( write :: S.WRITE ) UI.TimeSpace -> Effect (Either PopulateError Unit)
 addTimeSpaceScoped x@(UI.TimeSpace { id }) timeSpaces = do
-  succeeded <- IxSignalMap.set' id x timeSpaces
+  succeeded <- IxSignalMap.insert id x timeSpaces
   pure
     $ if succeeded then
         Right unit
@@ -121,7 +121,7 @@ addTimeSpaceScoped x@(UI.TimeSpace { id }) timeSpaces = do
 
 -- | Doesn't fail when existing - just re-assigns
 addTimeSpaceForce :: UI.TimeSpace -> UISets -> Effect Unit
-addTimeSpaceForce x@(UI.TimeSpace { id }) (UISets { timeSpaces }) = IxSignalMap.set id x timeSpaces
+addTimeSpaceForce x@(UI.TimeSpace { id }) (UISets { timeSpaces }) = IxSignalMap.assign id x timeSpaces
 
 -- | Looks for an already flat time space in the sets
 getTimeSpace :: TimeSpaceID -> UISetsM SynthesizeError UI.TimeSpace
@@ -141,7 +141,7 @@ addTimeline = asUISetsM (S.writeOnly <<< getTimelinesMapping) addTimelineScoped
 
 addTimelineScoped :: UI.Timeline -> IxSignalMap TimelineID ( write :: S.WRITE ) UI.Timeline -> Effect (Either PopulateError Unit)
 addTimelineScoped x@(UI.Timeline { id }) timelines = do
-  succeeded <- IxSignalMap.set' id x timelines
+  succeeded <- IxSignalMap.insert id x timelines
   pure
     $ if succeeded then
         Right unit
@@ -149,7 +149,7 @@ addTimelineScoped x@(UI.Timeline { id }) timelines = do
         Left (TimelineExists x)
 
 addTimelineForce :: UI.Timeline -> UISets -> Effect Unit
-addTimelineForce x@(UI.Timeline { id }) (UISets { timelines }) = IxSignalMap.set id x timelines
+addTimelineForce x@(UI.Timeline { id }) (UISets { timelines }) = IxSignalMap.assign id x timelines
 
 -- | Looks for an already flat timeline in the sets
 getTimeline :: TimelineID -> UISetsM SynthesizeError UI.Timeline
@@ -169,7 +169,7 @@ addEvent = asUISetsM (S.writeOnly <<< getEventsMapping) addEventScoped
 
 addEventScoped :: UI.Event -> IxSignalMap EventID ( write :: S.WRITE ) UI.Event -> Effect (Either PopulateError Unit)
 addEventScoped x@(UI.Event { id }) events = do
-  succeeded <- IxSignalMap.set' id x events
+  succeeded <- IxSignalMap.insert id x events
   pure
     $ if succeeded then
         Right unit
@@ -177,7 +177,7 @@ addEventScoped x@(UI.Event { id }) events = do
         Left (EventExists x)
 
 addEventForce :: UI.Event -> UISets -> Effect Unit
-addEventForce x@(UI.Event { id }) (UISets { events }) = IxSignalMap.set id x events
+addEventForce x@(UI.Event { id }) (UISets { events }) = IxSignalMap.assign id x events
 
 -- | Looks for an already flat event (as a sibling) in the sets
 getEvent :: EventID -> UISetsM SynthesizeError UI.Event
@@ -197,7 +197,7 @@ addTimeSpan = asUISetsM (S.writeOnly <<< getTimeSpansMapping) addTimeSpanScoped
 
 addTimeSpanScoped :: UI.TimeSpan -> IxSignalMap TimeSpanID ( write :: S.WRITE ) UI.TimeSpan -> Effect (Either PopulateError Unit)
 addTimeSpanScoped x@(UI.TimeSpan { id }) timeSpans = do
-  succeeded <- IxSignalMap.set' id x timeSpans
+  succeeded <- IxSignalMap.insert id x timeSpans
   pure
     $ if succeeded then
         Right unit
@@ -205,7 +205,7 @@ addTimeSpanScoped x@(UI.TimeSpan { id }) timeSpans = do
         Left (TimeSpanExists x)
 
 addTimeSpanForce :: UI.TimeSpan -> UISets -> Effect Unit
-addTimeSpanForce x@(UI.TimeSpan { id }) (UISets { timeSpans }) = IxSignalMap.set id x timeSpans
+addTimeSpanForce x@(UI.TimeSpan { id }) (UISets { timeSpans }) = IxSignalMap.assign id x timeSpans
 
 -- | Looks for an already flat time span (as a sibling) in the sets
 getTimeSpan :: TimeSpanID -> UISetsM SynthesizeError UI.TimeSpan

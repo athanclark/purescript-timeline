@@ -16,7 +16,7 @@ You can edit this file as you like.
   , "timeline-time"
   , "uuid"
   , "web-html"
-  , "zeta"
+  , "zeta-array"
   , "zeta-mapping"
   ]
 , packages = ./packages.dhall

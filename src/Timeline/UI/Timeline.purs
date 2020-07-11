@@ -86,3 +86,25 @@ instance defaultTimleine :: Default Timeline where
         , children
         , id: TimelineID (unsafePerformEffect UUID.genUUID)
         }
+
+-- newTimelinesSignal ::
+--   { timeSpacesMapping :: IxSignalMap TimeSpaceID (read :: S.READ, write :: S.WRITE) TimeSpace
+--   , timelinesMapping :: IxSignalMap TimelineID (read :: S.READ, write :: S.WRITE) Timeline
+--   , timeSpaceSelectedSignal :: IxSignal (read :: S.READ) (Array TimeSpaceID)
+--   , rootRef :: Ref (Maybe TimeSpaceID)
+--   } ->
+--   Effect (IxSignalArray (read :: S.READ, write :: S.WRITE) Timeline)
+-- newTimelinesSignal {timeSpacesMapping, timelinesMapping, timeSpaceSelectedSignal} = do
+--   currentTimeSpaceID <- getCurrentTimeSpaceID
+--   IxSignalArray.new
+--   where
+--     getCurrentTimeSpaceID :: Effect TimeSpaceID
+--     getCurrentTimeSpaceID = do
+--       timeSpaceIDs <- IxSignal.get timeSpaceSelectedSignal
+--       case Array.last timeSpaceIDs of
+--         Just last -> pure last
+--         Nothing -> do
+--           mRoot <- Ref.read rootRef
+--           case mRoot of
+--             Nothing -> throw "No root TimeSpaceID"
+--             Just root -> pure root
