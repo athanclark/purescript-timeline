@@ -1,6 +1,7 @@
 module Timeline.UI.Timeline where
 
 import Timeline.UI.EventOrTimeSpan (EventOrTimeSpanPoly(..))
+import Timeline.ID.TimeSpace (TimeSpaceID(..))
 import Timeline.ID.Timeline (TimelineID(..))
 import Timeline.ID.Event (EventID(..))
 import Timeline.ID.TimeSpan (TimeSpanID(..))
@@ -24,6 +25,7 @@ newtype Timeline
   -- TODO color
   , children :: Array (EventOrTimeSpanPoly EventID TimeSpanID)
   , id :: TimelineID
+  , timeSpace :: TimeSpaceID
   }
 
 derive instance genericTimeline :: Generic Timeline _
@@ -33,7 +35,7 @@ derive newtype instance eqTimeline :: Eq Timeline
 derive newtype instance showTimeline :: Show Timeline
 
 instance encodeJsonTimeline :: EncodeJson Timeline where
-  encodeJson (Timeline { name, description, children, id }) =
+  encodeJson (Timeline { name, description, children, id, timeSpace }) =
     "name" := name
       ~> "description"
       := description
@@ -41,6 +43,8 @@ instance encodeJsonTimeline :: EncodeJson Timeline where
       := children
       ~> "id"
       := id
+      ~> "timeSpace"
+      := timeSpace
       ~> jsonEmptyObject
 
 instance decodeJsonTimeline :: DecodeJson Timeline where
@@ -50,7 +54,8 @@ instance decodeJsonTimeline :: DecodeJson Timeline where
     description <- o .: "description"
     children <- o .: "children"
     id <- o .: "id"
-    pure (Timeline { name, description, children, id })
+    timeSpace <- o .: "timeSpace"
+    pure (Timeline { name, description, children, id, timeSpace })
 
 instance arbitraryTimeline :: Arbitrary Timeline where
   arbitrary = do
@@ -58,15 +63,10 @@ instance arbitraryTimeline :: Arbitrary Timeline where
     description <- genString
     children <- arbitrary
     id <- arbitrary
-    pure (Timeline { name, description, children, id })
+    timeSpace <- arbitrary
+    pure (Timeline { name, description, children, id, timeSpace })
 
--- -- | The key in the IxSignal that listens to changes
--- localstorageSignalKey :: String
--- localstorageSignalKey = "localstorage"
--- FIXME the only thing that should be stored, is the top-level Timeline.Data (TimeSpaceDecided) - all changes to
--- subsidiary signals bubble up to this signal, which gets stored at the top level.
--- localstorageKey :: String
--- localstorageKey = "Timeline"
+-- | FIXME shouldn't be necessary
 instance defaultTimleine :: Default Timeline where
   def =
     let
@@ -85,26 +85,5 @@ instance defaultTimleine :: Default Timeline where
         , description: ""
         , children
         , id: TimelineID (unsafePerformEffect UUID.genUUID)
+        , timeSpace: TimeSpaceID (unsafePerformEffect UUID.genUUID)
         }
-
--- newTimelinesSignal ::
---   { timeSpacesMapping :: IxSignalMap TimeSpaceID (read :: S.READ, write :: S.WRITE) TimeSpace
---   , timelinesMapping :: IxSignalMap TimelineID (read :: S.READ, write :: S.WRITE) Timeline
---   , timeSpaceSelectedSignal :: IxSignal (read :: S.READ) (Array TimeSpaceID)
---   , rootRef :: Ref (Maybe TimeSpaceID)
---   } ->
---   Effect (IxSignalArray (read :: S.READ, write :: S.WRITE) Timeline)
--- newTimelinesSignal {timeSpacesMapping, timelinesMapping, timeSpaceSelectedSignal} = do
---   currentTimeSpaceID <- getCurrentTimeSpaceID
---   IxSignalArray.new
---   where
---     getCurrentTimeSpaceID :: Effect TimeSpaceID
---     getCurrentTimeSpaceID = do
---       timeSpaceIDs <- IxSignal.get timeSpaceSelectedSignal
---       case Array.last timeSpaceIDs of
---         Just last -> pure last
---         Nothing -> do
---           mRoot <- Ref.read rootRef
---           case mRoot of
---             Nothing -> throw "No root TimeSpaceID"
---             Just root -> pure root

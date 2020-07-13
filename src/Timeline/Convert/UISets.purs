@@ -22,9 +22,9 @@ import Effect (Effect)
 import Effect.Ref (Ref)
 import Effect.Ref (new, write, read) as Ref
 import Effect.Class (class MonadEffect, liftEffect)
-import IxZeta.Map (IxSignalMap)
-import IxZeta.Map (new, insert, assign, get) as IxSignalMap
 import Zeta.Types (READ, WRITE, readOnly, writeOnly) as S
+import IxZeta.Map (IxSignalMap)
+import IxZeta.Map (new, insert, assign, assignExcept, get) as IxSignalMap
 import Unsafe.Coerce (unsafeCoerce)
 
 -- | Sets for all content, indexed by their UUID
@@ -121,7 +121,13 @@ addTimeSpaceScoped x@(UI.TimeSpace { id }) timeSpaces = do
 
 -- | Doesn't fail when existing - just re-assigns
 addTimeSpaceForce :: UI.TimeSpace -> UISets -> Effect Unit
-addTimeSpaceForce x@(UI.TimeSpace { id }) (UISets { timeSpaces }) = IxSignalMap.assign id x timeSpaces
+addTimeSpaceForce x@(UI.TimeSpace { id }) (UISets { timeSpaces }) = addTimeSpaceForceScoped x (S.writeOnly timeSpaces)
+
+addTimeSpaceForceScoped :: UI.TimeSpace -> IxSignalMap TimeSpaceID ( write :: S.WRITE ) UI.TimeSpace -> Effect Unit
+addTimeSpaceForceScoped x@(UI.TimeSpace { id }) timeSpaces = IxSignalMap.assign id x timeSpaces
+
+addTimeSpaceForceScopedExcept :: Array String -> UI.TimeSpace -> IxSignalMap TimeSpaceID ( write :: S.WRITE ) UI.TimeSpace -> Effect Unit
+addTimeSpaceForceScopedExcept indicies x@(UI.TimeSpace { id }) timeSpaces = IxSignalMap.assignExcept indicies id x timeSpaces
 
 -- | Looks for an already flat time space in the sets
 getTimeSpace :: TimeSpaceID -> UISetsM SynthesizeError UI.TimeSpace

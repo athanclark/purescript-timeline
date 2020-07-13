@@ -116,12 +116,12 @@ populateTimeSpace decidedUnit ( Data.TimeSpace
     Data.Timeline DecidedValue ->
     UISetsM PopulateError (Array TimelineID)
   populateTimelines ids timeline@(Data.Timeline { id: id' }) = do
-    populateTimeline timeline
+    populateTimeline id timeline -- id here references time space id
     pure (Array.snoc ids id')
 
 -- | Recursively add a `Timeline` to the sets
-populateTimeline :: Data.Timeline DecidedValue -> UISetsM PopulateError Unit
-populateTimeline (Data.Timeline { children, name, description, id }) = do
+populateTimeline :: TimeSpaceID -> Data.Timeline DecidedValue -> UISetsM PopulateError Unit
+populateTimeline timeSpace (Data.Timeline { children, name, description, id }) = do
   -- actually fold over the siblings
   childrenIds <- Array.foldM populateChildrenOrSiblings [] children
   let
@@ -132,6 +132,7 @@ populateTimeline (Data.Timeline { children, name, description, id }) = do
         , description
         , children: childrenIds
         , id
+        , timeSpace
         }
   addTimeline timeline'
 

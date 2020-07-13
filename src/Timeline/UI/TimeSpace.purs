@@ -2,36 +2,24 @@ module Timeline.UI.TimeSpace where
 
 import Timeline.UI.TimeSpace.TimeScale (TimeScale)
 import Timeline.UI.EventOrTimeSpan (EventOrTimeSpanPoly)
-import Timeline.UI.Settings (Settings(..))
 import Timeline.ID.TimeSpace (TimeSpaceID(..))
 import Timeline.ID.Timeline (TimelineID)
 import Timeline.ID.Event (EventID)
 import Timeline.ID.TimeSpan (TimeSpanID)
 import Prelude
-import Data.Maybe (Maybe(..))
-import Data.Either (Either(..))
 import Data.Default (def)
 import Data.UUID (genUUID) as UUID
 import Data.Generic.Rep (class Generic)
 import Data.Argonaut
   ( class EncodeJson
   , class DecodeJson
-  , encodeJson
   , decodeJson
   , (:=)
   , (~>)
   , jsonEmptyObject
   , (.:)
-  , jsonParser
-  , stringify
   )
 import Effect (Effect)
-import Effect.Exception (throw)
-import Web.HTML (window)
-import Web.HTML.Window (localStorage)
-import Web.Storage.Storage (setItem, getItem, removeItem)
-import Zeta.Types (READ, WRITE) as S
-import IxZeta (IxSignal, set, get, make, subscribeDiffLight)
 import Test.QuickCheck (class Arbitrary, arbitrary)
 import Test.QuickCheck.UTF8String (genString)
 
@@ -107,45 +95,3 @@ newTimeSpace { title, description, timeScale } = do
         , timelines: []
         , id: TimeSpaceID id
         }
-
-localstorageSignalKey :: String
-localstorageSignalKey = "localstorage"
-
-localstorageKey :: String
-localstorageKey = "TimeSpace"
-
--- | Create the "viewed time space" signal on boot, where the initial
--- | time space is synthesized by `UISets`.
-newTimeSpaceSignal ::
-  { settingsSignal :: IxSignal ( read :: S.READ ) Settings
-  , initialTimeSpace :: TimeSpace
-  } ->
-  Effect (IxSignal ( read :: S.READ, write :: S.WRITE ) TimeSpace)
-newTimeSpaceSignal { settingsSignal, initialTimeSpace } = do
-  store <- window >>= localStorage
-  mItem <- getItem localstorageKey store
-  item <- case mItem of
-    Nothing -> pure initialTimeSpace
-    Just s -> case jsonParser s >>= decodeJson of
-      Left e -> throw $ "Couldn't parse TimeSpace: " <> e
-      Right x -> pure x
-  sig <- make item
-  let
-    handler x = do
-      Settings { localCacheTilExport } <- get settingsSignal
-      when localCacheTilExport
-        $ setItem localstorageKey (stringify (encodeJson x)) store
-  subscribeDiffLight localstorageSignalKey handler sig
-  pure sig
-
-clearTimeSpaceCache :: Effect Unit
-clearTimeSpaceCache = do
-  store <- window >>= localStorage
-  removeItem localstorageKey store
-
-setNewDocumentTimeSpace ::
-  IxSignal ( write :: S.WRITE ) TimeSpace ->
-  Effect Unit
-setNewDocumentTimeSpace timeSpaceSignal = do
-  timeSpace <- defaultTimeSpace
-  set timeSpace timeSpaceSignal
