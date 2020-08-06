@@ -11,6 +11,8 @@ import Data.Array (uncons, unsnoc, snoc, foldl, foldr, length) as Array
 import Data.Default (class Default)
 import Data.Array.Indexed (IxArray)
 import Data.Array.Indexed (intoFrom, update', lookup, fromFoldable) as IxArray
+import Data.Array.Unique (UniqueArray)
+import Data.Array.Unique (unsafeMap, length, unsafeFromArray, empty) as UniqueArray
 import Effect.Unsafe (unsafePerformEffect)
 import Partial.Unsafe (unsafePartial)
 
@@ -20,7 +22,7 @@ newtype ExploreTimeSpaces
   { title :: String
   , limit :: DecidedMaybeLimit
   , id :: TimeSpaceID
-  , children :: Array ExploreTimeSpaces
+  , children :: UniqueArray ExploreTimeSpaces
   }
 
 instance defaultExploreTimeSpaces :: Default ExploreTimeSpaces where
@@ -35,41 +37,47 @@ instance defaultExploreTimeSpaces :: Default ExploreTimeSpaces where
                 }
       , id: TimeSpaceID (unsafePerformEffect UUID.genUUID)
       , children:
-          [ ExploreTimeSpaces
-              { title: "TimeSpace Child 1"
-              , limit: DecidedMaybeLimitNumber $ JustLimitBounds { begin: 0.0, end: 1.0 }
-              , id: TimeSpaceID (unsafePerformEffect UUID.genUUID)
-              , children: []
-              }
-          , ExploreTimeSpaces
-              { title: "TimeSpace Child 2"
-              , limit: DecidedMaybeLimitNumber $ JustLimitBounds { begin: 1.0, end: 2.0 }
-              , id: TimeSpaceID (unsafePerformEffect UUID.genUUID)
-              , children:
-                  [ ExploreTimeSpaces
-                      { title: "TimeSpace GrandChild 1"
-                      , limit: DecidedMaybeLimitNumber $ JustLimitBounds { begin: 2.0, end: 3.0 }
-                      , id: TimeSpaceID (unsafePerformEffect UUID.genUUID)
-                      , children: []
-                      }
-                  , ExploreTimeSpaces
-                      { title: "TimeSpace GrandChild 2"
-                      , limit: DecidedMaybeLimitNumber $ JustLimitBounds { begin: 4.0, end: 5.0 }
-                      , id: TimeSpaceID (unsafePerformEffect UUID.genUUID)
-                      , children: []
-                      }
-                  ]
-              }
-          , ExploreTimeSpaces
-              { title: "TimeSpace Child 3"
-              , limit: DecidedMaybeLimitNumber $ JustLimitBounds { begin: 6.0, end: 7.0 }
-              , id: TimeSpaceID (unsafePerformEffect UUID.genUUID)
-              , children: []
-              }
-          ]
+          UniqueArray.unsafeFromArray
+            [ ExploreTimeSpaces
+                { title: "TimeSpace Child 1"
+                , limit: DecidedMaybeLimitNumber $ JustLimitBounds { begin: 0.0, end: 1.0 }
+                , id: TimeSpaceID (unsafePerformEffect UUID.genUUID)
+                , children: UniqueArray.empty
+                }
+            , ExploreTimeSpaces
+                { title: "TimeSpace Child 2"
+                , limit: DecidedMaybeLimitNumber $ JustLimitBounds { begin: 1.0, end: 2.0 }
+                , id: TimeSpaceID (unsafePerformEffect UUID.genUUID)
+                , children:
+                    UniqueArray.unsafeFromArray
+                      [ ExploreTimeSpaces
+                          { title: "TimeSpace GrandChild 1"
+                          , limit: DecidedMaybeLimitNumber $ JustLimitBounds { begin: 2.0, end: 3.0 }
+                          , id: TimeSpaceID (unsafePerformEffect UUID.genUUID)
+                          , children: UniqueArray.empty
+                          }
+                      , ExploreTimeSpaces
+                          { title: "TimeSpace GrandChild 2"
+                          , limit: DecidedMaybeLimitNumber $ JustLimitBounds { begin: 4.0, end: 5.0 }
+                          , id: TimeSpaceID (unsafePerformEffect UUID.genUUID)
+                          , children: UniqueArray.empty
+                          }
+                      ]
+                }
+            , ExploreTimeSpaces
+                { title: "TimeSpace Child 3"
+                , limit: DecidedMaybeLimitNumber $ JustLimitBounds { begin: 6.0, end: 7.0 }
+                , id: TimeSpaceID (unsafePerformEffect UUID.genUUID)
+                , children: UniqueArray.empty
+                }
+            ]
       }
 
--- | Should be treated as only used by the dialog in it's component state
+-- | Should be treated as only used by the dialog in it's component state.
+-- |
+-- | `aux` represents arbitrary auxiliary information required by the component
+-- | state; for instance, an "open" boolean, determining if the dropdown is
+-- | open.
 newtype ExploreTimeSpacesWithAux aux
   = ExploreTimeSpacesWithAux
   { title :: String
@@ -90,7 +98,7 @@ exploreTimeSpacesWithAux defAux (ExploreTimeSpaces { title, limit, id, children 
     , limit
     , id
     , children:
-        if Array.length children == 0 then
+        if UniqueArray.length children == 0 then
           Nothing
         else
           Just
@@ -99,7 +107,7 @@ exploreTimeSpacesWithAux defAux (ExploreTimeSpaces { title, limit, id, children 
                 let
                   go x@(ExploreTimeSpaces { id: id' }) = Tuple (show id') (exploreTimeSpacesWithAux defAux x)
                 in
-                  IxArray.fromFoldable (map go children)
+                  IxArray.fromFoldable (UniqueArray.unsafeMap go children)
             }
     }
 
@@ -112,7 +120,7 @@ updateExploreTimeSpacesWithAux defAux (ExploreTimeSpacesWithAux x) (ExploreTimeS
       { title = y.title
       , limit = y.limit
       , children =
-        if Array.length y.children == 0 then
+        if UniqueArray.length y.children == 0 then
           Nothing
         else
           Just
@@ -121,7 +129,7 @@ updateExploreTimeSpacesWithAux defAux (ExploreTimeSpacesWithAux x) (ExploreTimeS
                 go f timeSpace@(ExploreTimeSpaces { id }) = Tuple (show id) (f timeSpace)
 
                 yChildrenValues :: forall a. (ExploreTimeSpaces -> a) -> IxArray a
-                yChildrenValues f = IxArray.fromFoldable (map (go f) y.children)
+                yChildrenValues f = IxArray.fromFoldable (UniqueArray.unsafeMap (go f) y.children)
               in
                 case x.children of
                   Nothing ->

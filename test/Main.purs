@@ -11,7 +11,6 @@ import Timeline.UI.Timeline (Timeline) as UI
 import Timeline.UI.Timeline.Children (Children) as UI
 import Timeline.UI.TimeSpace (TimeSpace) as UI
 import Timeline.UI.TimeSpace.TimeScale (TimeScale) as UI
-import Timeline.UI.TimeSpace.Timelines (Timelines) as UI
 import Timeline.UI.TimeSpace.Siblings (Siblings) as UI
 import Timeline.Convert (populate, synthesize) as Convert
 
@@ -66,7 +65,6 @@ tests = do
       jsonTest "Settings" (Proxy :: Proxy UI.Settings)
       jsonTest "TimeScale" (Proxy :: Proxy UI.TimeScale)
       jsonTest "Timeline" (Proxy :: Proxy UI.Timeline)
-      jsonTest "Timelines" (Proxy :: Proxy UI.Timelines)
       jsonTest "TimeSpace" (Proxy :: Proxy UI.TimeSpace)
       jsonTest "Children" (Proxy :: Proxy UI.Children)
       jsonTest "Siblings" (Proxy :: Proxy UI.Siblings)
@@ -111,7 +109,7 @@ jsonIso Proxy x =
   -- trace x \_ ->
   let result = decodeJson (encodeJson x)
   in  case result of
-        Left e -> Failed $ "Couldn't parse: " <> e
+        Left e -> Failed $ "Couldn't parse: " <> show e
         Right y
           | y == x -> Success
           | otherwise ->

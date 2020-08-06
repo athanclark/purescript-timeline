@@ -11,7 +11,7 @@ import Data.Argonaut
   , class DecodeJson
   , encodeJson
   , decodeJson
-  , fail
+  , JsonDecodeError(TypeMismatch)
   )
 import Data.ArrayBuffer.Class
   ( class EncodeArrayBuffer
@@ -24,6 +24,7 @@ import Data.ArrayBuffer.Class
 import Data.ArrayBuffer.Class.Types (Uint8(..))
 import Data.Vec (Vec)
 import Data.Typelevel.Num (D16)
+import Control.Monad.Error.Class (throwError)
 import Effect.Exception (throw)
 import Test.QuickCheck (class Arbitrary, arbitrary)
 import Partial.Unsafe (unsafePartial)
@@ -45,7 +46,7 @@ instance decodeJsonTimeSpaceID :: DecodeJson TimeSpaceID where
   decodeJson json = do
     s <- decodeJson json
     case UUID.parseUUID s of
-      Nothing -> fail $ "Can't parse TimeSpaceID: " <> show s
+      Nothing -> throwError $ TypeMismatch $ "Can't parse TimeSpaceID: " <> show s
       Just x -> pure (TimeSpaceID x)
 
 instance encodeArrayBufferTimeSpaceID :: EncodeArrayBuffer TimeSpaceID where

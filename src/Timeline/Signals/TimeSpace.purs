@@ -2,7 +2,7 @@ module Timeline.Signals.TimeSpace where
 
 import Timeline.UI.TimeSpace (TimeSpace)
 import Timeline.ID.TimeSpace (TimeSpaceID)
-import Timeline.Convert.UISets (getTimeSpaceScoped, addTimeSpaceForceScopedExcept)
+import Timeline.Convert.UISets.TimeSpaces (getTimeSpaceScoped, addTimeSpaceForceScopedExcept)
 import Prelude
 import Data.Maybe (Maybe(..))
 import Data.Tuple (Tuple(..))
@@ -90,7 +90,8 @@ newTimeSpaceSignal { timeSpacesMapping, timeSpaceSelectedSignal, rootRef } = do
   IxSignalMap.subscribeLight "TimeSpaceSignal" handleMappingUpdate timeSpacesMapping
   -- Overwrite existing time space in set when viewed updates
   let
-    handleViewedUpdate :: TimeSpace -> Effect Unit
-    handleViewedUpdate timeSpace = addTimeSpaceForceScopedExcept [ "TimeSpaceSignal" ] timeSpace (S.writeOnly timeSpacesMapping)
-  IxSignal.subscribeLight "TimeSpaceSignal" handleViewedUpdate sig
+    handleSelfUpdate :: TimeSpace -> Effect Unit
+    handleSelfUpdate timeSpace = addTimeSpaceForceScopedExcept [ "TimeSpaceSignal" ] timeSpace (S.writeOnly timeSpacesMapping)
+  -- FIXME dereference Timelines and Siblings when necessary
+  IxSignal.subscribeLight "TimeSpaceSignal" handleSelfUpdate sig
   pure sig

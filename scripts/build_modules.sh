@@ -6,7 +6,7 @@ MODULES=./graphs/modules.dot
 MODULESOUT=./graphs/modules.png
 
 # build graph
-find src .spago/timeline-time/master/src/ test -name '*.purs' | xargs $GRAPHMOD -q \
+find src test -name '*.purs' | xargs $GRAPHMOD -q \
   -R "Scripts" -d 48,32 > $MODULES \
   || { exit 1; }
 # rename graph

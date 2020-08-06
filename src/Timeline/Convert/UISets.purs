@@ -1,5 +1,16 @@
 module Timeline.Convert.UISets where
 
+import Timeline.Convert.UISets.TimeSpaces
+  ( getTimeSpaceScoped
+  , addTimeSpaceScoped
+  , addTimeSpaceForceScoped
+  , appendTimelineScopedExcept
+  , removeTimelineScopedExcept
+  )
+import Timeline.Convert.UISets.Timelines (getTimelineScoped, addTimelineScoped)
+import Timeline.Convert.UISets.Events (getEventScoped, addEventScoped)
+import Timeline.Convert.UISets.TimeSpans (getTimeSpanScoped, addTimeSpanScoped)
+import Timeline.Convert.UISets.EventsOrTimeSpans (getEventOrTimeSpanScoped)
 import Timeline.Convert.Errors (PopulateError(..), SynthesizeError(..))
 import Timeline.UI.TimeSpace (TimeSpace(..)) as UI
 import Timeline.UI.Timeline (Timeline(..)) as UI
@@ -23,8 +34,8 @@ import Effect.Ref (Ref)
 import Effect.Ref (new, write, read) as Ref
 import Effect.Class (class MonadEffect, liftEffect)
 import Zeta.Types (READ, WRITE, readOnly, writeOnly) as S
-import IxZeta.Map (IxSignalMap)
-import IxZeta.Map (new, insert, assign, assignExcept, get) as IxSignalMap
+import IxZeta.Map (IxSignalMap, MapUpdate(..))
+import IxZeta.Map (new, insert, assign, assignExcept, get, subscribeLight) as IxSignalMap
 import Unsafe.Coerce (unsafeCoerce)
 
 -- | Sets for all content, indexed by their UUID
@@ -58,6 +69,33 @@ new = do
   timelines <- IxSignalMap.new { fromString: unsafeCoerce, toString: unsafeCoerce }
   events <- IxSignalMap.new { fromString: unsafeCoerce, toString: unsafeCoerce }
   timeSpans <- IxSignalMap.new { fromString: unsafeCoerce, toString: unsafeCoerce }
+  -- can update timelines or siblings
+  let
+    handleTimeSpacesMappingUpdate :: Tuple TimeSpaceID (MapUpdate UI.TimeSpace) -> Effect Unit
+    handleTimeSpacesMappingUpdate (Tuple _ mapUpdate) = case mapUpdate of
+      -- Via Insert, you know that all instances will be "new", to the universe of sets
+      -- FIXME siblings and timelines should already exist, and if not, they will by the time lookups happen
+      MapInsert _ -> pure unit
+      -- FIXME find and update timeliens / siblings parent
+      MapUpdate { valueNew: UI.TimeSpace { timelines, siblings } } -> pure unit
+      -- FIXME delete children
+      MapDelete { valueOld: UI.TimeSpace { timelines, siblings } } -> pure unit
+  IxSignalMap.subscribeLight "UISets" handleTimeSpacesMappingUpdate timeSpaces
+  let
+    handleTimelinesMappingUpdate :: Tuple TimelineID (MapUpdate UI.Timeline) -> Effect Unit
+    handleTimelinesMappingUpdate (Tuple id mapUpdate) = case mapUpdate of
+      -- FIXME children should already exist, and if not, they will by the time lookups happen
+      MapInsert { valueNew: UI.Timeline { timeSpace } } -> void (appendTimelineScopedExcept [ "UISets" ] id timeSpace timeSpaces)
+      MapUpdate { valueOld: UI.Timeline { children: childrenOld, timeSpace: timeSpaceOld }, valueNew: UI.Timeline { children: childrenNew, timeSpace: timeSpaceNew } } ->
+        -- Implements movement of self, FIXME ignores children's parent references
+        if timeSpaceOld == timeSpaceNew then
+          pure unit
+        else do
+          void (removeTimelineScopedExcept [ "UISets" ] id timeSpaceOld timeSpaces)
+          void (appendTimelineScopedExcept [ "UISets" ] id timeSpaceNew timeSpaces)
+      -- removes self from parent
+      MapDelete { valueOld: UI.Timeline { timeSpace } } -> void (removeTimelineScopedExcept [ "UISets" ] id timeSpace timeSpaces)
+  -- FIXME finish rest of mapping updates
   root <- Ref.new Nothing
   pure
     $ UISets
@@ -80,7 +118,6 @@ derive newtype instance monadEffectUISetsM :: MonadEffect (UISetsM e)
 
 derive newtype instance monadThrowUISetsM :: MonadThrow e (UISetsM e)
 
--- derive newtype instance monadErrorUISetsM :: MonadError e (UISetsM e)
 derive newtype instance monadAskUISetsM :: MonadAsk UISets (UISetsM e)
 
 runUISetsM :: forall e a. UISetsM e a -> UISets -> Effect (Either e a)
@@ -110,49 +147,17 @@ asUISetsM' fromUISets f = do
 addTimeSpace :: UI.TimeSpace -> UISetsM PopulateError Unit
 addTimeSpace = asUISetsM (S.writeOnly <<< getTimeSpacesMapping) addTimeSpaceScoped
 
-addTimeSpaceScoped :: UI.TimeSpace -> IxSignalMap TimeSpaceID ( write :: S.WRITE ) UI.TimeSpace -> Effect (Either PopulateError Unit)
-addTimeSpaceScoped x@(UI.TimeSpace { id }) timeSpaces = do
-  succeeded <- IxSignalMap.insert id x timeSpaces
-  pure
-    $ if succeeded then
-        Right unit
-      else
-        Left (TimeSpaceExists x)
-
 -- | Doesn't fail when existing - just re-assigns
 addTimeSpaceForce :: UI.TimeSpace -> UISets -> Effect Unit
 addTimeSpaceForce x@(UI.TimeSpace { id }) (UISets { timeSpaces }) = addTimeSpaceForceScoped x (S.writeOnly timeSpaces)
-
-addTimeSpaceForceScoped :: UI.TimeSpace -> IxSignalMap TimeSpaceID ( write :: S.WRITE ) UI.TimeSpace -> Effect Unit
-addTimeSpaceForceScoped x@(UI.TimeSpace { id }) timeSpaces = IxSignalMap.assign id x timeSpaces
-
-addTimeSpaceForceScopedExcept :: Array String -> UI.TimeSpace -> IxSignalMap TimeSpaceID ( write :: S.WRITE ) UI.TimeSpace -> Effect Unit
-addTimeSpaceForceScopedExcept indicies x@(UI.TimeSpace { id }) timeSpaces = IxSignalMap.assignExcept indicies id x timeSpaces
 
 -- | Looks for an already flat time space in the sets
 getTimeSpace :: TimeSpaceID -> UISetsM SynthesizeError UI.TimeSpace
 getTimeSpace = asUISetsM (S.readOnly <<< getTimeSpacesMapping) getTimeSpaceScoped
 
-getTimeSpaceScoped :: TimeSpaceID -> IxSignalMap TimeSpaceID ( read :: S.READ ) UI.TimeSpace -> Effect (Either SynthesizeError UI.TimeSpace)
-getTimeSpaceScoped id timeSpaces = do
-  mTimeSpace <- IxSignalMap.get id timeSpaces
-  pure
-    $ case mTimeSpace of
-        Nothing -> Left (TimeSpaceDoesntExist id)
-        Just timeSpace -> Right timeSpace
-
 -- | Includes an already flat timeline - doesn't verify constituents
 addTimeline :: UI.Timeline -> UISetsM PopulateError Unit
 addTimeline = asUISetsM (S.writeOnly <<< getTimelinesMapping) addTimelineScoped
-
-addTimelineScoped :: UI.Timeline -> IxSignalMap TimelineID ( write :: S.WRITE ) UI.Timeline -> Effect (Either PopulateError Unit)
-addTimelineScoped x@(UI.Timeline { id }) timelines = do
-  succeeded <- IxSignalMap.insert id x timelines
-  pure
-    $ if succeeded then
-        Right unit
-      else
-        Left (TimelineExists x)
 
 addTimelineForce :: UI.Timeline -> UISets -> Effect Unit
 addTimelineForce x@(UI.Timeline { id }) (UISets { timelines }) = IxSignalMap.assign id x timelines
@@ -161,26 +166,9 @@ addTimelineForce x@(UI.Timeline { id }) (UISets { timelines }) = IxSignalMap.ass
 getTimeline :: TimelineID -> UISetsM SynthesizeError UI.Timeline
 getTimeline = asUISetsM (S.readOnly <<< getTimelinesMapping) getTimelineScoped
 
-getTimelineScoped :: TimelineID -> IxSignalMap TimelineID ( read :: S.READ ) UI.Timeline -> Effect (Either SynthesizeError UI.Timeline)
-getTimelineScoped id timelines = do
-  mTimeline <- IxSignalMap.get id timelines
-  pure
-    $ case mTimeline of
-        Nothing -> Left (TimelineDoesntExist id)
-        Just timeline -> Right timeline
-
 -- | Includes an already flat event as a sibling - doesn't verify constituents
 addEvent :: UI.Event -> UISetsM PopulateError Unit
 addEvent = asUISetsM (S.writeOnly <<< getEventsMapping) addEventScoped
-
-addEventScoped :: UI.Event -> IxSignalMap EventID ( write :: S.WRITE ) UI.Event -> Effect (Either PopulateError Unit)
-addEventScoped x@(UI.Event { id }) events = do
-  succeeded <- IxSignalMap.insert id x events
-  pure
-    $ if succeeded then
-        Right unit
-      else
-        Left (EventExists x)
 
 addEventForce :: UI.Event -> UISets -> Effect Unit
 addEventForce x@(UI.Event { id }) (UISets { events }) = IxSignalMap.assign id x events
@@ -189,26 +177,9 @@ addEventForce x@(UI.Event { id }) (UISets { events }) = IxSignalMap.assign id x 
 getEvent :: EventID -> UISetsM SynthesizeError UI.Event
 getEvent = asUISetsM (S.readOnly <<< getEventsMapping) getEventScoped
 
-getEventScoped :: EventID -> IxSignalMap EventID ( read :: S.READ ) UI.Event -> Effect (Either SynthesizeError UI.Event)
-getEventScoped id events = do
-  mEvent <- IxSignalMap.get id events
-  pure
-    $ case mEvent of
-        Nothing -> Left (EventDoesntExist id)
-        Just event -> Right event
-
 -- | Includes an already flat time span as a sibling - doesn't verify constituents
 addTimeSpan :: UI.TimeSpan -> UISetsM PopulateError Unit
 addTimeSpan = asUISetsM (S.writeOnly <<< getTimeSpansMapping) addTimeSpanScoped
-
-addTimeSpanScoped :: UI.TimeSpan -> IxSignalMap TimeSpanID ( write :: S.WRITE ) UI.TimeSpan -> Effect (Either PopulateError Unit)
-addTimeSpanScoped x@(UI.TimeSpan { id }) timeSpans = do
-  succeeded <- IxSignalMap.insert id x timeSpans
-  pure
-    $ if succeeded then
-        Right unit
-      else
-        Left (TimeSpanExists x)
 
 addTimeSpanForce :: UI.TimeSpan -> UISets -> Effect Unit
 addTimeSpanForce x@(UI.TimeSpan { id }) (UISets { timeSpans }) = IxSignalMap.assign id x timeSpans
@@ -217,29 +188,12 @@ addTimeSpanForce x@(UI.TimeSpan { id }) (UISets { timeSpans }) = IxSignalMap.ass
 getTimeSpan :: TimeSpanID -> UISetsM SynthesizeError UI.TimeSpan
 getTimeSpan = asUISetsM (S.readOnly <<< getTimeSpansMapping) getTimeSpanScoped
 
-getTimeSpanScoped :: TimeSpanID -> IxSignalMap TimeSpanID ( read :: S.READ ) UI.TimeSpan -> Effect (Either SynthesizeError UI.TimeSpan)
-getTimeSpanScoped id timeSpans = do
-  mTimeSpan <- IxSignalMap.get id timeSpans
-  pure
-    $ case mTimeSpan of
-        Nothing -> Left (TimeSpanDoesntExist id)
-        Just timeSpan -> Right timeSpan
-
 getEventOrTimeSpan :: UI.EventOrTimeSpanPoly EventID TimeSpanID -> UISetsM SynthesizeError UI.EventOrTimeSpan
 getEventOrTimeSpan = asUISetsM getEventsAndTimeSpansMappings getEventOrTimeSpanAsTuple
   where
   getEventsAndTimeSpansMappings uiSets = Tuple (S.readOnly (getEventsMapping uiSets)) (S.readOnly (getTimeSpansMapping uiSets))
 
   getEventOrTimeSpanAsTuple id (Tuple events timeSpans) = getEventOrTimeSpanScoped id events timeSpans
-
-getEventOrTimeSpanScoped ::
-  UI.EventOrTimeSpanPoly EventID TimeSpanID ->
-  IxSignalMap EventID ( read :: S.READ ) UI.Event ->
-  IxSignalMap TimeSpanID ( read :: S.READ ) UI.TimeSpan ->
-  Effect (Either SynthesizeError UI.EventOrTimeSpan)
-getEventOrTimeSpanScoped (UI.EventOrTimeSpanPoly eOrTs) events timeSpans = case eOrTs of
-  Left e -> map (UI.EventOrTimeSpan <<< Left) <$> getEventScoped e events
-  Right ts -> map (UI.EventOrTimeSpan <<< Right) <$> getTimeSpanScoped ts timeSpans
 
 -- | Assigns the root field of a set
 setRoot :: TimeSpaceID -> UISets -> Effect Unit

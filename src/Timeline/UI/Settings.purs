@@ -36,9 +36,10 @@ import Data.Argonaut
   , (~>)
   , jsonEmptyObject
   , stringify
-  , jsonParser
+  , parseJson
   )
 import Data.Default (class Default, def)
+import Data.Profunctor.Choice (left)
 import Web.HTML (window)
 import Web.HTML.Window (localStorage)
 import Web.Storage.Storage (setItem, getItem)
@@ -120,9 +121,9 @@ newSettingsSignal { wasOpenedByShareLink } = do
   mItem <- getItem localstorageKey store
   item <- case mItem of
     Nothing -> pure def
-    Just s -> case jsonParser s >>= decodeJson of
+    Just s -> case parseJson s >>= decodeJson of
       Left e -> do
-        warn $ "Couldn't parse Settings: " <> e
+        warn $ "Couldn't parse Settings: " <> show e
         pure
           $ case def of
               Settings x -> Settings x { isEditable = not wasOpenedByShareLink }

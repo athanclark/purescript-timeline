@@ -26,6 +26,8 @@ import Timeline.ID.TimeSpan (TimeSpanID)
 import Prelude
 import Data.Maybe (Maybe(..))
 import Data.Either (Either(..))
+import Data.Array.Unique (UniqueArray)
+import Data.Array.Unique (unsafeMap, unsafeTraverse, unsafeSequence) as UniqueArray
 import Data.Tuple (Tuple(..))
 import Data.Tuple.Nested
   ( type (/\)
@@ -64,8 +66,8 @@ import Type.Proxy (Proxy(..))
 newtype TimeSpace index
   = TimeSpace
   { timeScale :: TimeScale index
-  , timelines :: Array (Timeline index)
-  , siblings :: Array (EventOrTimeSpan index)
+  , timelines :: UniqueArray (Timeline index)
+  , siblings :: UniqueArray (EventOrTimeSpan index)
   -- non-essential
   , title :: String
   , description :: String
@@ -79,8 +81,8 @@ instance functorTimeSpace :: Functor TimeSpace where
   map f (TimeSpace x) =
     TimeSpace
       x
-        { timelines = map (map f) x.timelines
-        , siblings = map (map f) x.siblings
+        { timelines = UniqueArray.unsafeMap (map f) x.timelines
+        , siblings = UniqueArray.unsafeMap (map f) x.siblings
         , timeScale = map f x.timeScale
         }
 
@@ -116,8 +118,8 @@ instance traversableTimeSpace :: Traversable TimeSpace where
             }
     in
       go <$> traverse f x.timeScale
-        <*> traverse (\t -> traverse f t) x.timelines
-        <*> traverse (\eOrTs -> traverse f eOrTs) x.siblings
+        <*> UniqueArray.unsafeTraverse (\t -> traverse f t) x.timelines
+        <*> UniqueArray.unsafeTraverse (\eOrTs -> traverse f eOrTs) x.siblings
   sequence (TimeSpace x) =
     let
       go timeScale timelines siblings =
@@ -129,8 +131,8 @@ instance traversableTimeSpace :: Traversable TimeSpace where
             }
     in
       go <$> sequence x.timeScale
-        <*> sequence (map sequence x.timelines)
-        <*> sequence (map sequence x.siblings)
+        <*> UniqueArray.unsafeSequence (UniqueArray.unsafeMap sequence x.timelines)
+        <*> UniqueArray.unsafeSequence (UniqueArray.unsafeMap sequence x.siblings)
 
 instance eqTimeSpace :: Ord index => Eq (TimeSpace index) where
   eq (TimeSpace x) (TimeSpace y) =
@@ -176,7 +178,7 @@ instance encodeJsonTimeSpace :: EncodeJson index => EncodeJson (TimeSpace index)
       := id
       ~> jsonEmptyObject
 
-instance decodeJsonTimeSpace :: (DecodeJson index, Ord index) => DecodeJson (TimeSpace index) where
+instance decodeJsonTimeSpace :: (DecodeJson index, Ord index, Show index) => DecodeJson (TimeSpace index) where
   decodeJson json = do
     o <- decodeJson json
     timeScale <- o .: "timeScale"
@@ -192,7 +194,7 @@ instance decodeJsonTimeSpace :: (DecodeJson index, Ord index) => DecodeJson (Tim
 instance encodeArrayBufferTimeSpace :: EncodeArrayBuffer index => EncodeArrayBuffer (TimeSpace index) where
   putArrayBuffer b o (TimeSpace { timeScale, timelines, siblings, title, description, id }) = putArrayBuffer b o (tuple6 timeScale timelines siblings title description id)
 
-instance decodeArrayBufferTimeSpace :: (DecodeArrayBuffer index, DynamicByteLength index, Ord index) => DecodeArrayBuffer (TimeSpace index) where
+instance decodeArrayBufferTimeSpace :: (DecodeArrayBuffer index, DynamicByteLength index, Ord index, Show index) => DecodeArrayBuffer (TimeSpace index) where
   readArrayBuffer b o = do
     let
       go :: _ /\ _ /\ _ /\ _ /\ _ /\ _ /\ Unit -> TimeSpace index
@@ -357,7 +359,7 @@ derive newtype instance arbitraryEventOrTimeSpanData :: Arbitrary index => Arbit
 -- | A set of Timeline children - events and timespans
 newtype Timeline index
   = Timeline
-  { children :: Array (EventOrTimeSpan index) -- TODO optional auxillary sorting data
+  { children :: UniqueArray (EventOrTimeSpan index) -- TODO optional auxillary sorting data
   -- non-essential
   , name :: String
   , description :: String
@@ -368,7 +370,7 @@ newtype Timeline index
 derive instance genericTimeline :: Generic (Timeline index) _
 
 instance functorTimeline :: Functor Timeline where
-  map f (Timeline x) = Timeline x { children = map (map f) x.children }
+  map f (Timeline x) = Timeline x { children = UniqueArray.unsafeMap (map f) x.children }
 
 instance foldableTimeline :: Foldable Timeline where
   foldr f acc (Timeline x) = foldr (\eOrTs acc' -> foldr f acc' eOrTs) acc x.children
@@ -378,10 +380,10 @@ instance foldableTimeline :: Foldable Timeline where
 instance traversableTimeline :: Traversable Timeline where
   traverse f (Timeline x) =
     (\children -> Timeline x { children = children })
-      <$> traverse (\eOrTs -> traverse f eOrTs) x.children
+      <$> UniqueArray.unsafeTraverse (\eOrTs -> traverse f eOrTs) x.children
   sequence (Timeline x) =
     (\children -> Timeline x { children = children })
-      <$> sequence (map sequence x.children)
+      <$> UniqueArray.unsafeSequence (UniqueArray.unsafeMap sequence x.children)
 
 instance eqTimeline :: Ord index => Eq (Timeline index) where
   eq (Timeline x) (Timeline y) =
@@ -415,7 +417,7 @@ instance encodeJsonTimeline :: EncodeJson index => EncodeJson (Timeline index) w
       := id
       ~> jsonEmptyObject
 
-instance decodeJsonTimeline :: (DecodeJson index, Ord index) => DecodeJson (Timeline index) where
+instance decodeJsonTimeline :: (DecodeJson index, Ord index, Show index) => DecodeJson (Timeline index) where
   decodeJson json = do
     o <- decodeJson json
     children <- o .: "children"
@@ -427,7 +429,7 @@ instance decodeJsonTimeline :: (DecodeJson index, Ord index) => DecodeJson (Time
 instance encodeArrayBufferTimeline :: EncodeArrayBuffer index => EncodeArrayBuffer (Timeline index) where
   putArrayBuffer b o (Timeline { children, name, description, id }) = putArrayBuffer b o (tuple4 children name description id)
 
-instance decodeArrayBufferTimeline :: (DecodeArrayBuffer index, DynamicByteLength index, Ord index) => DecodeArrayBuffer (Timeline index) where
+instance decodeArrayBufferTimeline :: (DecodeArrayBuffer index, DynamicByteLength index, Ord index, Show index) => DecodeArrayBuffer (Timeline index) where
   readArrayBuffer b o = do
     let
       go :: _ /\ _ /\ _ /\ _ /\ Unit -> Timeline index

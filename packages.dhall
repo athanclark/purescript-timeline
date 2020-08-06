@@ -119,7 +119,7 @@ let additions =
 
 
 let upstream =
-      https://github.com/purescript/package-sets/releases/download/psc-0.13.8-20200708/packages.dhall sha256:df5b0f1ae92d4401404344f4fb2a7a3089612c9f30066dcddf9eaea4fe780e29
+      https://github.com/purescript/package-sets/releases/download/psc-0.13.8-20200724/packages.dhall sha256:bb941d30820a49345a0e88937094d2b9983d939c9fd3a46969b85ce44953d7d9
 
 let overrides =
       { uuid =
@@ -131,33 +131,36 @@ let overrides =
       }
 
 let additions =
-      { indexed-array =
-        { dependencies =
-          [ "arrays", "foreign-object", "generics-rep", "quickcheck-utf8" ]
-        , repo =
-            "https://github.com/openchronology/purescript-indexed-array.git"
-        , version = "v0.0.0"
-        }
-      , quickcheck-utf8 =
-        { dependencies = [ "quickcheck" ]
-        , repo =
-            "https://github.com/openchronology/purescript-quickcheck-utf8.git"
-        , version = "master"
-        }
-      , file-store =
+      { file-store =
         { dependencies = [ "aff", "arraybuffer", "b64", "promises", "web-html" ]
         , repo = "https://github.com/openchronology/purescript-file-store.git"
+        , version = "master"
+        }
+      , indexed-array =
+        { dependencies = [ "generics-rep" ]
+        , repo = "https://github.com/openchronology/purescript-indexed-array.git"
         , version = "master"
         }
       , timeline-time =
         { dependencies = [ "arraybuffer-class", "argonaut" ]
         , repo =
             "https://github.com/openchronology/purescript-timeline-time.git"
+        , version = "v0.0.0-rc1"
+        }
+      , unique-array =
+        { dependencies = [ "arrays", "generics-rep", "arraybuffer-class", "argonaut" ]
+        , repo = "https://github.com/openchronology/purescript-unique-array.git"
         , version = "master"
         }
       , zeta-array =
         { dependencies = [ "zeta", "queue" ]
         , repo = "https://github.com/openchronology/purescript-zeta-array.git"
+        , version = "master"
+        }
+      , zeta-unique-array =
+        { dependencies = [ "zeta", "queue", "unique-array" ]
+        , repo =
+            "https://github.com/openchronology/purescript-zeta-unique-array.git"
         , version = "master"
         }
       , zeta-mapping =

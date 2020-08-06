@@ -19,6 +19,8 @@ import Data.Argonaut
   , jsonEmptyObject
   , (.:)
   )
+import Data.Array.Unique (UniqueArray)
+import Data.Array.Unique (empty) as UniqueArray
 import Effect (Effect)
 import Test.QuickCheck (class Arbitrary, arbitrary)
 import Test.QuickCheck.UTF8String (genString)
@@ -28,8 +30,8 @@ newtype TimeSpace
   { title :: String
   , description :: String
   , timeScale :: TimeScale
-  , siblings :: Array (EventOrTimeSpanPoly EventID TimeSpanID) -- TODO manual field sorting
-  , timelines :: Array TimelineID
+  , siblings :: UniqueArray (EventOrTimeSpanPoly EventID TimeSpanID) -- TODO manual field sorting
+  , timelines :: UniqueArray TimelineID
   , id :: TimeSpaceID
   }
 
@@ -91,7 +93,7 @@ newTimeSpace { title, description, timeScale } = do
         { title
         , description
         , timeScale
-        , siblings: []
-        , timelines: []
+        , siblings: UniqueArray.empty
+        , timelines: UniqueArray.empty
         , id: TimeSpaceID id
         }

@@ -26,6 +26,7 @@ module Timeline.Signals where
 -- import IxZeta.Map (subscribeLight, updateExcept, assignExcept, deleteExcept) as IxSignalMap
 -- import IxZeta.Array (IxSignalArray, ArrayUpdate (..))
 -- import IxZeta.Array (new, subscribeLight, overwriteExcept, appendExcept, updateExcept, deleteExcept, get) as IxSignalArray
+-- FIXME Events and TimeSpans would have `parent :: Either TimeSpaceID TimelineID`?
 -- newSiblingsSignal ::
 --   { timeSpacesMapping :: IxSignalMap TimeSpaceID (read :: S.READ, write :: S.WRITE) TimeSpace
 --   , eventsMapping :: IxSignalMap EventID (read :: S.READ, write :: S.WRITE) Event

@@ -15,15 +15,15 @@ import Timeline.Convert.UISets
   , addTimeSpan
   , setRoot
   , getTimeSpace
-  , getTimeSpaceScoped
   , getTimeline
-  , getTimelineScoped
   , getEvent
   , getTimeSpan
-  , getTimeSpanScoped
   , getRoot
   , new
   )
+import Timeline.Convert.UISets.TimeSpaces (getTimeSpaceScoped)
+import Timeline.Convert.UISets.Timelines (getTimelineScoped)
+import Timeline.Convert.UISets.TimeSpans (getTimeSpanScoped)
 import Timeline.Convert.Errors (PopulateError(..), SynthesizeError(..))
 import Timeline.Convert.TimeScale (dataToUi, uiToData) as ConvertTimeScale
 import Timeline.Convert.Event (dataToUi, uiToData) as ConvertEvent
@@ -55,6 +55,9 @@ import Data.Maybe (Maybe(..))
 import Data.Either (Either(..))
 import Data.Tuple (Tuple(..))
 import Data.Array (snoc, foldM, mapMaybe, concatMap) as Array
+import Data.Array.Unique (UniqueArray)
+import Data.Array.Unique (unsafeMapMaybe, unsafeTraverse, unsafeConcatMap, unsafeSequence, unsafeAppend, unsafeSnoc, empty) as UniqueArray
+import Data.Foldable (foldM)
 import Data.Traversable (traverse, sequence)
 import Control.Monad.Error.Class (throwError)
 import Effect (Effect)
@@ -88,9 +91,9 @@ populateTimeSpace decidedUnit ( Data.TimeSpace
   }
 ) = do
   -- actually fold over the timelines
-  timelineIds <- Array.foldM populateTimelines [] timelines
+  timelineIds <- foldM populateTimelines UniqueArray.empty timelines
   -- actually fold over the siblings
-  siblingIds <- Array.foldM populateChildrenOrSiblings [] siblings
+  siblingIds <- foldM populateChildrenOrSiblings UniqueArray.empty siblings
   -- convert the time scale
   timeScale' <- case ConvertTimeScale.dataToUi decidedUnit timeScale of
     Nothing -> throwError (ConvertTimeScaleFailed { decidedUnit, timeScale })
@@ -112,18 +115,18 @@ populateTimeSpace decidedUnit ( Data.TimeSpace
   where
   -- folds through the timelines, gathering ids as they're added to the sets
   populateTimelines ::
-    Array TimelineID ->
+    UniqueArray TimelineID ->
     Data.Timeline DecidedValue ->
-    UISetsM PopulateError (Array TimelineID)
+    UISetsM PopulateError (UniqueArray TimelineID)
   populateTimelines ids timeline@(Data.Timeline { id: id' }) = do
     populateTimeline id timeline -- id here references time space id
-    pure (Array.snoc ids id')
+    pure (UniqueArray.unsafeSnoc ids id')
 
 -- | Recursively add a `Timeline` to the sets
 populateTimeline :: TimeSpaceID -> Data.Timeline DecidedValue -> UISetsM PopulateError Unit
 populateTimeline timeSpace (Data.Timeline { children, name, description, id }) = do
   -- actually fold over the siblings
-  childrenIds <- Array.foldM populateChildrenOrSiblings [] children
+  childrenIds <- foldM populateChildrenOrSiblings UniqueArray.empty children
   let
     timeline' :: UI.Timeline
     timeline' =
@@ -138,20 +141,20 @@ populateTimeline timeSpace (Data.Timeline { children, name, description, id }) =
 
 -- | folds through the children, gathering ids as they're added to the sets
 populateChildrenOrSiblings ::
-  Array (UI.EventOrTimeSpanPoly EventID TimeSpanID) ->
+  UniqueArray (UI.EventOrTimeSpanPoly EventID TimeSpanID) ->
   Data.EventOrTimeSpan DecidedValue ->
-  UISetsM PopulateError (Array (UI.EventOrTimeSpanPoly EventID TimeSpanID))
+  UISetsM PopulateError (UniqueArray (UI.EventOrTimeSpanPoly EventID TimeSpanID))
 populateChildrenOrSiblings ids (Data.EventOrTimeSpan x) = case x of
   Left e@(Data.Event { id: id' }) -> do
     -- directly convert the leaf node, event
     addEvent (ConvertEvent.dataToUi e)
     let
-      ids' = Array.snoc ids (UI.EventOrTimeSpanPoly (Left id'))
+      ids' = UniqueArray.unsafeSnoc ids (UI.EventOrTimeSpanPoly (Left id'))
     pure ids'
   Right t@(Data.TimeSpan { id: id' }) -> do
     populateTimeSpan t
     let
-      ids' = Array.snoc ids (UI.EventOrTimeSpanPoly (Right id'))
+      ids' = UniqueArray.unsafeSnoc ids (UI.EventOrTimeSpanPoly (Right id'))
     pure ids'
 
 -- | Recursively add a child `TimeSpan` to the sets
@@ -219,8 +222,8 @@ synthesizeTimeSpace id = do
     getTimeSpace id
   let
     { unit: decidedUnit, timeScale: timeScale' } = ConvertTimeScale.uiToData timeScale
-  timelines' <- traverse synthesizeTimeline timelines
-  siblings' <- traverse synthesizeEventOrTimeSpan siblings
+  timelines' <- UniqueArray.unsafeTraverse synthesizeTimeline timelines
+  siblings' <- UniqueArray.unsafeTraverse synthesizeEventOrTimeSpan siblings
   pure $ Tuple decidedUnit
     $ Data.TimeSpace
         { title
@@ -240,7 +243,7 @@ synthesizeTimeline id = do
   , id: id'
   } <-
     getTimeline id
-  children' <- traverse synthesizeEventOrTimeSpan children
+  children' <- UniqueArray.unsafeTraverse synthesizeEventOrTimeSpan children
   pure
     $ Data.Timeline
         { name
@@ -314,39 +317,39 @@ synthesizeExploreTimeSpacesScoped { timeSpacesMapping, timelinesMapping, timeSpa
         }
       ) -> do
         let
-          getSpans :: Array (UI.EventOrTimeSpanPoly EventID TimeSpanID) -> Array TimeSpanID
-          getSpans = Array.mapMaybe getSpan
+          getSpans :: UniqueArray (UI.EventOrTimeSpanPoly EventID TimeSpanID) -> UniqueArray TimeSpanID
+          getSpans = UniqueArray.unsafeMapMaybe getSpan
             where
             getSpan (UI.EventOrTimeSpanPoly eOrTs) = case eOrTs of
               Left _ -> Nothing
               Right ts -> Just ts
-        eSiblings <- traverse (flip getTimeSpanScoped timeSpansMapping) (getSpans siblings)
-        case sequence eSiblings of
+        eSiblings <- UniqueArray.unsafeTraverse (flip getTimeSpanScoped timeSpansMapping) (getSpans siblings)
+        case UniqueArray.unsafeSequence eSiblings of
           Left e -> pure (Left e)
           Right siblings' -> do
-            eTimelines <- traverse (flip getTimelineScoped timelinesMapping) timelines
-            case sequence eTimelines of
+            eTimelines <- UniqueArray.unsafeTraverse (flip getTimelineScoped timelinesMapping) timelines
+            case UniqueArray.unsafeSequence eTimelines of
               Left e -> pure (Left e)
               Right timelines' -> do
                 let
-                  childrenOfTimelines :: Array TimeSpanID
+                  childrenOfTimelines :: UniqueArray TimeSpanID
                   childrenOfTimelines =
-                    Array.concatMap
+                    UniqueArray.unsafeConcatMap
                       (\(UI.Timeline { children }) -> getSpans children)
                       timelines'
-                eChildren <- traverse (flip getTimeSpanScoped timeSpansMapping) childrenOfTimelines
-                case sequence eChildren of
+                eChildren <- UniqueArray.unsafeTraverse (flip getTimeSpanScoped timeSpansMapping) childrenOfTimelines
+                case UniqueArray.unsafeSequence eChildren of
                   Left e -> pure (Left e)
                   Right children' -> do
                     let
-                      siblingsWithTimeSpaces :: Array TimeSpaceID
-                      siblingsWithTimeSpaces = Array.mapMaybe (\(UI.TimeSpan { timeSpace }) -> timeSpace) siblings'
+                      siblingsWithTimeSpaces :: UniqueArray TimeSpaceID
+                      siblingsWithTimeSpaces = UniqueArray.unsafeMapMaybe (\(UI.TimeSpan { timeSpace }) -> timeSpace) siblings'
 
-                      childrenWithTimeSpaces :: Array TimeSpaceID
-                      childrenWithTimeSpaces = Array.mapMaybe (\(UI.TimeSpan { timeSpace }) -> timeSpace) children'
+                      childrenWithTimeSpaces :: UniqueArray TimeSpaceID
+                      childrenWithTimeSpaces = UniqueArray.unsafeMapMaybe (\(UI.TimeSpan { timeSpace }) -> timeSpace) children'
                     -- recurse
-                    eDescendants <- traverse go (siblingsWithTimeSpaces <> childrenWithTimeSpaces)
-                    case sequence eDescendants of
+                    eDescendants <- UniqueArray.unsafeTraverse go (UniqueArray.unsafeAppend siblingsWithTimeSpaces childrenWithTimeSpaces)
+                    case UniqueArray.unsafeSequence eDescendants of
                       Left e -> pure (Left e)
                       Right children ->
                         pure

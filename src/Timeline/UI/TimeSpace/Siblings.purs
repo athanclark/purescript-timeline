@@ -6,7 +6,7 @@ import Prelude
 import Data.Maybe (Maybe(..))
 import Data.Either (Either(..))
 import Data.Generic.Rep (class Generic)
-import Data.Argonaut (class EncodeJson, class DecodeJson, jsonParser, stringify, decodeJson, encodeJson)
+import Data.Argonaut (class EncodeJson, class DecodeJson, parseJson, stringify, decodeJson, encodeJson)
 import Test.QuickCheck (class Arbitrary)
 import Effect (Effect)
 import Effect.Exception (throw)
@@ -48,8 +48,8 @@ newSiblingsSignal { settingsSignal, initialSiblings } = do
   mItem <- getItem localstorageKey store
   item <- case mItem of
     Nothing -> pure initialSiblings
-    Just s -> case jsonParser s >>= decodeJson of
-      Left e -> throw $ "Couldn't parse Siblings: " <> e
+    Just s -> case parseJson s >>= decodeJson of
+      Left e -> throw $ "Couldn't parse Siblings: " <> show e
       Right x -> pure x
   sig <- make item
   let

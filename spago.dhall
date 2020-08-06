@@ -17,6 +17,7 @@ You can edit this file as you like.
   , "uuid"
   , "web-html"
   , "zeta-array"
+  , "zeta-unique-array"
   , "zeta-mapping"
   ]
 , packages = ./packages.dhall

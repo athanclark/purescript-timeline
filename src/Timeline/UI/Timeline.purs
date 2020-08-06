@@ -9,6 +9,8 @@ import Prelude
 import Data.Either (Either(..))
 import Data.Generic.Rep (class Generic)
 import Data.Argonaut (class EncodeJson, class DecodeJson, (:=), (~>), jsonEmptyObject, (.:), decodeJson)
+import Data.Array.Unique (UniqueArray)
+import Data.Array.Unique (unsafeFromArray) as UniqueArray
 import Data.Default (class Default)
 import Data.UUID (genUUID) as UUID
 import Data.Unfoldable (replicateA)
@@ -23,7 +25,7 @@ newtype Timeline
   { name :: String
   , description :: String
   -- TODO color
-  , children :: Array (EventOrTimeSpanPoly EventID TimeSpanID)
+  , children :: UniqueArray (EventOrTimeSpanPoly EventID TimeSpanID)
   , id :: TimelineID
   , timeSpace :: TimeSpaceID
   }
@@ -73,12 +75,14 @@ instance defaultTimleine :: Default Timeline where
       children =
         unsafePerformEffect do
           l <- randomInt 1 20
-          replicateA l do
-            lOrR <- randomInt 1 2
-            unsafePartial $ map EventOrTimeSpanPoly
-              $ case lOrR of
-                  1 -> Left <<< EventID <$> UUID.genUUID
-                  2 -> Right <<< TimeSpanID <$> UUID.genUUID
+          xs <-
+            replicateA l do
+              lOrR <- randomInt 1 2
+              unsafePartial $ map EventOrTimeSpanPoly
+                $ case lOrR of
+                    1 -> Left <<< EventID <$> UUID.genUUID
+                    2 -> Right <<< TimeSpanID <$> UUID.genUUID
+          pure (UniqueArray.unsafeFromArray xs)
     in
       Timeline
         { name: "Timeline"
