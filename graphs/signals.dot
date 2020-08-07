@@ -43,6 +43,7 @@ digraph Signals {
   siblingsViewed -> timeSpans [dir=both, label="3"];
 
   timelineSelected -> childrenViewed [color="#009900", label="read only"];
+  childrenViewed -> timelinesViewed [dir=both, label="4"];
   childrenViewed -> events [dir=both, label="4"];
   childrenViewed -> timeSpans [dir=both, label="4"];
 }

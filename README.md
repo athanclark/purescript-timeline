@@ -50,3 +50,35 @@ current network of data flow:
 
 ## Mappings
 
+The recursive data type that describes the stored document isn't sufficient for incremental modification; for that, we'll
+need to make a series of mappings which _reference_ each other - following the references can recreate the recursion.
+
+There are four primary mappings: `TimeSpaces`, `Timelines`, `Events`, and `TimeSpans` - these are sufficient for storing
+everything in both an OpenChronology document, and its user interface.
+
+However, changes in each of these must be reflected (when necessary) to their constituent children or parents. For instance,
+what if one child is removed? Should it's parent reference be eliminated? What about re-sorting of children, should they
+care? What if a child decides it wants to get adopted - how do we let the parent know?
+
+- `5` is an edge that represents the binding between `TimeSpaces` and `Timelines`
+- `6` is two edges that represents the binding between `TimeSpaces` and both `Events` and `TimeSpans` - as "siblings"
+- `7` is two edges that represents the binding between `Timelines` and both `Events` and `TimeSpans` - as "children"
+
+## Views
+
+When using the user interface, you're only viewing _one_ `TimeSpace` at a time. However, this is exactly how the
+document gets _edited_ - incrementally. Therefore, we need to address how we present the relative data, and how
+its modification should affect both the _rest_ of the viewed data, and the stored data not currently in view.
+
+There are four primary views, and two secondary ones: `TimeSpaceViewed`, `TimelinesViewed`, `SiblingsViewed`, and `ChildrenViewed`
+are all primary components of the user interface, while `Selected TimeSpace Index` explicitly states the
+index (as a series of parents) of the currently viewed timespace, and `Selected Timeline` explicitly states which
+timeline is currently being selected from the listing of `TimelinesViewed`.
+
+- `1` is an edge that represents how changes to the viewed timespace can reflect changes to itself in the mapping, and vise-versa.
+- `2` is two edges that represent how changes to the listing of timelines (belonging to the current timespace) can reflect
+  changes to their stored versions, _and_ how they're listed in the currently viewed timespace (and vise-versa).
+- `3` is three edges that represent how changes to the listing of siblings (belonging to the current timespace) can reflect
+  changes to their stored events or timespans, _and_ how they're listed in the currently viewed timespace (and vise-versa).
+- `4` is three edges that represent how changes to the listing of children (belonging to the current timeline) can reflect
+  changes to their stored events or timespans, _and_ how they're listed in the currently selected timeline (and vise-versa).
