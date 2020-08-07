@@ -1,0 +1,48 @@
+digraph Signals {
+  size="48,32";
+  // ratio="fill";
+
+  subgraph cluster_0 {
+    label="Mappings (Total Storage)";
+    color="#0000000F";
+    style="filled";
+    timeSpaces[label="TimeSpaces (Map TimeSpaceID TimeSpace)",style="filled",fillcolor="#ffbbbb",penwidth="0"];
+    timelines[label="Timelines (Map TimelineID Timeline)",style="filled",fillcolor="#ffbbbb",penwidth="0"];
+    events[label="Events (Map EventID Event)",style="filled",fillcolor="#ffbbbb",penwidth="0"];
+    timeSpans[label="TimeSpans (Map TimeSpanID TimeSpan)",style="filled",fillcolor="#ffbbbb",penwidth="0"];
+  }
+
+  subgraph cluster_1 {
+    label="Partial View (User Interface)";
+    color="#0000000F";
+    style="filled";
+    timeSpaceViewed[label="TimeSpace Viewed (TimeSpace)",style="filled",fillcolor="#bbbbff",penwidth="0"];
+    timeSpaceIndex[label="Selected TimeSpace Index (NonEmptyArray TimeSpaceID)",style="filled",fillcolor="#bbffbb",penwidth="0"];
+    timelinesViewed[label="Timelines Viewed (Array Timeline)",style="filled",fillcolor="#bbbbff",penwidth="0"];
+    timelineSelected[label="Selected Timeline (Maybe TimelineID)",style="filled",fillcolor="#bbffbb",penwidth="0"];
+    siblingsViewed[label="Siblings Viewed (Array (Event or TimeSpan))",style="filled",fillcolor="#bbbbff",penwidth="0"];
+    childrenViewed[label="Children Viewed (Maybe (Array (Event or TimeSpan)))",style="filled",fillcolor="#bbbbff",penwidth="0"];
+  }
+
+  // inner mapping connectivity
+  timeSpaces -> timelines [dir=both, color="#ff9999", label="5"];
+  timeSpaces -> events [dir=both, color="#ff9999", label="6"];
+  timeSpaces -> timeSpans [dir=both, color="#ff9999", label="6"];
+  timelines -> events [dir=both, color="#ff9999", label="7"];
+  timelines -> timeSpans [dir=both, color="#ff9999", label="7"];
+
+  timeSpaceIndex -> timeSpaceViewed [color="#009900", label="read only"];
+  timeSpaceViewed -> timeSpaces [dir=both, label="1"];
+  // timeSpaceViewed -> timelines;
+
+  timelinesViewed -> timeSpaceViewed [dir=both, label="2"];
+  timelinesViewed -> timelines [dir=both, label="2"];
+
+  siblingsViewed -> timeSpaceViewed [dir=both, label="3"];
+  siblingsViewed -> events [dir=both, label="3"];
+  siblingsViewed -> timeSpans [dir=both, label="3"];
+
+  timelineSelected -> childrenViewed [color="#009900", label="read only"];
+  childrenViewed -> events [dir=both, label="4"];
+  childrenViewed -> timeSpans [dir=both, label="4"];
+}

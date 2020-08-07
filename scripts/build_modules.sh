@@ -4,6 +4,8 @@
 GRAPHMOD=graphmod
 MODULES=./graphs/modules.dot
 MODULESOUT=./graphs/modules.png
+SIGNALS=./graphs/signals.dot
+SIGNALSOUT=./graphs/signals.png
 
 # build graph
 find src test -name '*.purs' | xargs $GRAPHMOD -q \
@@ -15,3 +17,6 @@ sed -i 's/digraph G/digraph Modules/' $MODULES
 sed -i 's/\(.*\) -> \(.*\);/\2 -> \1;/' $MODULES
 # draw graph to svg
 dot -Tpng $MODULES -o $MODULESOUT
+
+# draw signals graph
+dot -Tpng $SIGNALS -o $SIGNALSOUT

@@ -27,7 +27,7 @@ There are a number of data types using obscure verbiage in this project:
   - "**Storable**" - an Index that makes sense to JSON and ArrayBuffers - minimalistic approach to representing the **Human TimeIndex** without losing any data.
     This could be a `Int8` for small enough **TimeScales**, or it may just be a `UTF-8 String` for a Date-Time.
 
-## Hierarchy
+## Data Hierarchy
 
 - TimeSpace
   - TimeScale
@@ -38,3 +38,15 @@ There are a number of data types using obscure verbiage in this project:
     - TimeSpan
       - TimeIndex
       - TimeSpace
+
+
+# Signals
+
+This package defines many different inter-woven signals, each behaving as a "source of truth" for some smaller component
+that views it. However, we have to keep all of these sources of truth _correct_. The following diagram describes the
+current network of data flow:
+
+![](https://github.com/openchronology/purescript-timeline/raw/master/graphs/signals.png)
+
+## Mappings
+
