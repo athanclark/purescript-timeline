@@ -82,3 +82,13 @@ timeline is currently being selected from the listing of `TimelinesViewed`.
   changes to their stored events or timespans, _and_ how they're listed in the currently viewed timespace (and vise-versa).
 - `4` is three edges that represent how changes to the listing of children (belonging to the current timeline) can reflect
   changes to their stored events or timespans, _and_ how they're listed in the currently selected timeline (and vise-versa).
+
+## Composition
+
+You'll notice the following commutive properties, in terms of edge tracing:
+
+- `1 . 2 == 5 . 2` - timelines viewed updates timespace viewed, which updates itself == timelines viewed updates itself, which the
+  mapping equalizes
+- `1 . 3 == 6 . 3` - siblings viewed updates timespace viewed, which updates itself == siblings viewed updates itself, which the
+  mapping equalizes
+- `4 == 7 . 4` - children viewed updates itself == children viewed updates timelines viewed, which the mapping equalizes
